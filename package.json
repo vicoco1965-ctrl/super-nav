@@ -1,0 +1,14 @@
+{
+  "name": "super-nav",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test bot/test/*.test.mjs",
+    "sync-store": "node bot/scripts/extract-store.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  }
+}

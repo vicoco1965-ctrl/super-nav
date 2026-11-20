@@ -1,0 +1,29 @@
+# Cloudflare Worker: the WhatsApp bot + the navigation site (site/ folder)
+name = "super-nav"
+main = "bot/src/index.js"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[assets]
+directory = "./site"
+binding = "ASSETS"
+
+[ai]
+binding = "AI"
+
+[[durable_objects.bindings]]
+name = "CUSTOMERS"
+class_name = "Customer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Customer"]
+
+[observability]
+enabled = true
+
+# Secrets (set in the Cloudflare dashboard, never in this file):
+#   WHATSAPP_TOKEN  access token from Meta
+#   APP_SECRET      Meta app secret, used to check that messages really come from WhatsApp
+#   VERIFY_TOKEN    optional, the word typed in Meta's webhook screen (default: super-nav)
