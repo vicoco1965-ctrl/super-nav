@@ -578,17 +578,56 @@ async function askFor(phrase) {
 // Mute and "add item" while navigating
 $("muteBtn").addEventListener("click", () => setMuted(!muted));
 let askMode = false;
+// One-shot listening for "add item". Phones' own recognizer works best in single-phrase mode
+// (continuous mode on Android Chrome often never delivers a final result), so it gets its own
+// recognizer, shows what it hears in the box, and uses the last heard words when it stops.
+// inside the Claude viewer the page uses Claude dictation instead (the frame blocks the browser recognizer)
+const SRClass = window.claude ? null : (window.SpeechRecognition || window.webkitSpeechRecognition);
+let addRec = null, addHeard = "";
+const SR_ERR = { "not-allowed": "אין הרשאה למיקרופון. אשר מיקרופון לאתר בהגדרות הדפדפן, או הקלד.", "service-not-allowed": "אין הרשאה למיקרופון. אשר מיקרופון לאתר בהגדרות הדפדפן, או הקלד.", "no-speech": "לא שמעתי כלום. לחץ שוב ודבר קרוב לטלפון.", "audio-capture": "לא נמצא מיקרופון פעיל. אולי אפליקציה אחרת משתמשת בו.", "network": "זיהוי הדיבור צריך חיבור לאינטרנט. בדוק את החיבור ונסה שוב." };
+function addListening(on) { $("addBtn").textContent = on ? "🎤 מקשיב... (לחץ לסיום)" : "➕ הוסף פריט"; $("addBtn").classList.toggle("primary", on); }
+function finishAdd(text) {
+  addListening(false); askMode = false;
+  text = (text || "").trim();
+  if (text) { $("addText").value = ""; $("addBox").hidden = true; askFor(text); }
+}
 $("addBtn").addEventListener("click", () => {
   stopSpeaking();
-  // always offer typing; also listen when the microphone is available
   $("addBox").hidden = false;
+  // second press while listening = done
+  if (addRec) { try { addRec.stop(); } catch (e) {} return; }
+  if (askMode && dict && !SRClass) { try { dict.stop(); } catch (e) {} return; }
+  const hands = listening;
+  if (SRClass) {
+    if (hands && dict) { try { dict.stop(); } catch (e) {} }   // the phone allows one recognizer at a time
+    addHeard = ""; $("addText").value = "";
+    let rec;
+    try { rec = new SRClass(); } catch (e) { $("addText").focus(); return; }
+    rec.lang = "he-IL"; rec.continuous = false; rec.interimResults = true; rec.maxAlternatives = 1;
+    rec.onresult = ev => { let t = ""; for (let k = 0; k < ev.results.length; k++) t += ev.results[k][0].transcript; addHeard = t.trim(); $("addText").value = addHeard; };
+    rec.onerror = ev => { $("live").textContent = SR_ERR[ev.error] || ("בעיה במיקרופון (" + ev.error + "). אפשר להקליד."); };
+    rec.onend = () => {
+      addRec = null; const t = addHeard; finishAdd(t);
+      if (!t) $("addText").focus();
+      if (hands && dict) dict.start().catch(() => setListening(false));
+    };
+    addRec = rec; askMode = true; addListening(true);
+    $("live").textContent = "מקשיב... אמור מה להוסיף, למשל \"טחינה\"";
+    // speech playback on some phones blocks the mic for a moment; start right after it is cancelled
+    setTimeout(() => { try { rec.start(); } catch (e) { addRec = null; addListening(false); askMode = false; $("addText").focus(); } }, 250);
+    return;
+  }
   if (dict) {
-    if (listening) { askMode = true; $("live").textContent = "מקשיב... אמור מה להוסיף, או הקלד"; return; }
-    askMode = true; $("live").textContent = "אמור מה להוסיף, למשל \"טחינה\", או הקלד";
-    dict.start().then(() => { $("addBtn").textContent = "🎤 מקשיב..."; }).catch(() => { askMode = false; $("addText").focus(); });
-  } else $("addText").focus();
+    askMode = true; addHeard = ""; addListening(true);
+    $("live").textContent = "מקשיב... אמור מה להוסיף, או הקלד";
+    if (hands) return;
+    dict.start().catch(e => { askMode = false; addListening(false); $("live").textContent = e && e.code === "not_granted" ? "אין הרשאה למיקרופון. אפשר להקליד." : "המיקרופון לא זמין כאן. אפשר להקליד."; $("addText").focus(); });
+    return;
+  }
+  $("live").textContent = "בדפדפן הזה אין זיהוי דיבור. הקלד את הפריט.";
+  $("addText").focus();
 });
-function addTyped() { const v = $("addText").value.trim(); if (!v) return; $("addText").value = ""; $("addBox").hidden = true; if (askMode) { askMode = false; $("addBtn").textContent = "➕ הוסף פריט"; if (dict && !listening) dict.stop().catch(() => {}); } askFor(v); }
+function addTyped() { const v = $("addText").value.trim(); if (!v) return; if (addRec) { addHeard = ""; try { addRec.abort(); } catch (e) {} } if (askMode && dict && !listening && !SRClass) dict.stop().catch(() => {}); finishAdd(v); }
 $("addGo").addEventListener("click", addTyped);
 $("addText").addEventListener("keydown", e => { if (e.key === "Enter") addTyped(); });
 // "Say the list" on the list screen
@@ -839,11 +878,11 @@ function wireDictation(d) {
   if (!d) { $("handsBtn").hidden = true; $("sayListBtn").hidden = true; $("live").textContent = "בדפדפן הזה אין פקודות קוליות. הכפתורים הגדולים עובדים בכל מקום."; return; }
   d.onFinal(({ text }) => {
     if (listMode) { heard.push(text); status("שמעתי: " + heard.join(" ")); return; }
-    if (askMode) { askMode = false; $("addBtn").textContent = "➕ הוסף פריט"; $("addBox").hidden = true; if (!listening) d.stop().catch(() => {}); askFor(text); return; }
+    if (askMode && !addRec) { if (!listening) d.stop().catch(() => {}); finishAdd(text); return; }
     command(text);
   });
-  d.onPartial(({ text }) => { if (listMode) status("שמעתי: " + heard.concat([text]).join(" ")); });
-  d.onState(({ state }) => { if (state === "idle") { if (listening) setListening(false); if (listMode) finishListMode(); } });
+  d.onPartial(({ text }) => { if (listMode) status("שמעתי: " + heard.concat([text]).join(" ")); else if (askMode && !addRec) { addHeard = text; $("addText").value = text; } });
+  d.onState(({ state }) => { if (state === "idle") { if (listening) setListening(false); if (listMode) finishListMode(); if (askMode && !addRec) finishAdd(addHeard); } });
 }
 
 // ---------- Boot ----------
