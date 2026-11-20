@@ -16,18 +16,18 @@
 :root{
   --bg:#f3f6f4; --surface:#ffffff; --fg:#14231d; --muted:#5b6b64; --line:#d5ded9;
   --accent:#0f6b52; --accent-fg:#ffffff; --tag:#ffd84a; --tag-fg:#1c1a0e; --warn:#b5481d;
-  --shelf:#c9d6cf; --floor:#fbfcfb; --zone:#e4efe9; --route:#0f6b52; --done:#9fb3aa;
+  --shelf:#c9d6cf; --floor:#fbfcfb; --zone:#e4efe9; --route:#0f6b52; --done:#9fb3aa; --now:#d62839; --now-fg:#ffffff;
   --display:"Secular One","Assistant",system-ui,sans-serif;
   --body:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0f1714; --surface:#17221e; --fg:#e6efe9; --muted:#9db0a7; --line:#2b3a34;
   --accent:#3fbf95; --accent-fg:#06140f; --tag:#f2cc3c; --tag-fg:#1c1a0e; --warn:#ff8c5a;
-  --shelf:#34463f; --floor:#131d19; --zone:#1d2d27; --route:#3fbf95; --done:#4d625a; color-scheme:dark}}
+  --shelf:#34463f; --floor:#131d19; --zone:#1d2d27; --route:#3fbf95; --done:#4d625a; --now:#ff5a64; --now-fg:#1a0004; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0f1714; --surface:#17221e; --fg:#e6efe9; --muted:#9db0a7; --line:#2b3a34;
   --accent:#3fbf95; --accent-fg:#06140f; --tag:#f2cc3c; --tag-fg:#1c1a0e; --warn:#ff8c5a;
-  --shelf:#34463f; --floor:#131d19; --zone:#1d2d27; --route:#3fbf95; --done:#4d625a; color-scheme:dark}
+  --shelf:#34463f; --floor:#131d19; --zone:#1d2d27; --route:#3fbf95; --done:#4d625a; --now:#ff5a64; --now-fg:#1a0004; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.5;direction:rtl}
 .wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px;display:flex;flex-direction:column;gap:18px}
@@ -65,13 +65,16 @@ textarea{font:inherit;width:100%;min-height:96px;border-radius:10px;border:1px s
 .map text{font-family:var(--body);font-size:11px;fill:var(--fg)}
 .map .lbl{font-weight:700}
 .map .zone{fill:var(--zone);stroke:var(--line)}
-.map .zone.on{fill:var(--tag);stroke:var(--tag-fg)}
+.map .zone.on{fill:var(--tag);stroke:var(--now);stroke-width:2.5}
 .map .shelf{fill:var(--shelf)}
-.map .route{fill:none;stroke:var(--route);stroke-width:4;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:2 7}
-.map .leg{fill:none;stroke:var(--route);stroke-width:5;stroke-linejoin:round;stroke-linecap:round}
+.map .route{fill:none;stroke:var(--done);stroke-width:3;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:2 6;opacity:.7}
+.map .leg{fill:none;stroke:var(--now);stroke-width:6;stroke-linejoin:round;stroke-linecap:round}
 .map .stop{fill:var(--surface);stroke:var(--route);stroke-width:2}
 .map .stop.done{fill:var(--done);stroke:var(--done)}
-.map .stop.cur{fill:var(--tag);stroke:var(--tag-fg);stroke-width:2.5}
+.map .stop.cur{fill:var(--now);stroke:var(--now-fg);stroke-width:2.5}
+.map .stopn.cur{fill:var(--now-fg)}
+.map .stop{opacity:1}
+.map .stop.later{stroke:var(--done)}
 .map .stopn{font-size:10px;font-weight:700;text-anchor:middle;dominant-baseline:central;fill:var(--fg)}
 .map .zone.est{stroke-dasharray:4 3;stroke:var(--muted)}
 .map .zone.promo{fill:var(--floor);stroke-dasharray:2 3;stroke:var(--muted)}
@@ -440,8 +443,8 @@ function drawMap() {
   if (curLeg) m.appendChild(el("polyline", { points: pts(curLeg), class: "leg" }));
   stops.forEach((s, i) => {
     const [x, y] = s.section.stop;
-    m.appendChild(el("circle", { cx: x, cy: y, r: 8, class: "stop" + (i < cur ? " done" : i === cur ? " cur" : "") }));
-    m.appendChild(el("text", { x, y, class: "stopn" }, s.end ? "✓" : String(i + 1)));
+    m.appendChild(el("circle", { cx: x, cy: y, class: "stop" + (i < cur ? " done" : i === cur ? " cur" : " later"), r: i === cur ? 11 : 8 }));
+    m.appendChild(el("text", { x, y, class: "stopn" + (i === cur ? " cur" : "") }, s.end ? "✓" : String(i + 1)));
   });
   if (here) {
     const [x, y] = here.stop;
