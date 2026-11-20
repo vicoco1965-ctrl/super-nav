@@ -1,5 +1,6 @@
 // Route building and Hebrew directions for the bot. Same ordering rules as the site.
-import { SECTIONS, BYID, CHECKOUT, BACK, BACK_ORDER, clean, matchSection, leg, startsKw, splitList, whereFromWords } from "./store-core.js";
+import { DIST } from "./distances.js";
+import { SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK, BACK_ORDER, clean, matchSection, leg, startsKw, splitList, whereFromWords } from "./store-core.js";
 
 export const END = { id: "checkout", where: "קופות השירות העצמי ואחריהן הקופות, בצד שמאל של החנות", stop: CHECKOUT, num: "✓" };
 
@@ -7,7 +8,7 @@ export const END = { id: "checkout", where: "קופות השירות העצמי 
 const distMemo = new Map();
 export function walk(a, b) {
   const k = a.join(",") + "|" + b.join(",");
-  let d = distMemo.get(k);
+  let d = DIST[k] ?? distMemo.get(k);
   if (d === undefined) {
     const p = leg(a, b); d = 0;
     for (let i = 1; i < p.length; i++) d += Math.abs(p[i][0] - p[i - 1][0]) + Math.abs(p[i][1] - p[i - 1][1]);
@@ -22,26 +23,25 @@ export function buildStops(items) {
   for (const it of items) if (it.section && BYID[it.section]) (groups[it.section] ||= []).push(it.name);
   const backUsed = Object.keys(groups).some(id => BYID[id].order > 2 && BYID[id].order <= BACK_ORDER);
   const rank = sec => sec.aisle ? (backUsed ? 10 + (15 - sec.aisle) : 10 + sec.aisle) : sec.id === "home" ? (backUsed ? 30 : 2.5) : sec.id === "beer" ? (backUsed ? 9 : 25) : sec.order;
-  return Object.keys(groups).map(id => ({ id, items: groups[id] })).sort((a, b) => rank(BYID[a.id]) - rank(BYID[b.id]));
+  const sorted = Object.keys(groups).map(id => ({ id, items: groups[id] })).sort((a, b) => rank(BYID[a.id]) - rank(BYID[b.id]));
+  return orderStops(ENTRANCE, sorted, false);
 }
 
-// Re-order the remaining stops starting from where the customer stands: their own section first,
-// then nearest next, tidied with 2-opt so the walk doesn't double back.
-export function reorderFrom(here, rest) {
-  rest = rest.slice();
-  const ordered = [];
-  const mine = rest.findIndex(s => s.id === here.id);
-  if (mine >= 0) ordered.push(rest.splice(mine, 1)[0]);
-  let pos = here.stop;
+// Order stops for the shortest walk from `start` to the checkouts: nearest-next, then 2-opt to undo detours.
+// Same as orderStops() in the site. lockFirst keeps stop 0 in place.
+export function orderStops(start, list, lockFirst) {
+  const rest = list.slice(), ordered = [];
+  let pos = start;
+  if (lockFirst && rest.length) { ordered.push(rest.shift()); pos = BYID[ordered[0].id].stop; }
   while (rest.length) {
     let bi = 0, bd = Infinity;
     rest.forEach((s, i) => { const d = walk(pos, BYID[s.id].stop); if (d < bd) { bd = d; bi = i; } });
     pos = BYID[rest[bi].id].stop; ordered.push(rest.splice(bi, 1)[0]);
   }
-  const cost = seq => { let d = 0, p = here.stop; for (const x of seq) { d += walk(p, BYID[x.id].stop); p = BYID[x.id].stop; } return d + walk(p, CHECKOUT); };
+  const cost = seq => { let d = 0, p = start; for (const x of seq) { d += walk(p, BYID[x.id].stop); p = BYID[x.id].stop; } return d + walk(p, CHECKOUT); };
   let best = ordered, bestCost = cost(best);
-  const lock = mine >= 0 ? 1 : 0;
-  for (let improved = true, rounds = 0; improved && rounds < 30; rounds++) {
+  const lock = lockFirst ? 1 : 0;
+  for (let improved = true, rounds = 0; improved && rounds < 50; rounds++) {
     improved = false;
     for (let i = lock; i < best.length - 1; i++) for (let j = i + 1; j < best.length; j++) {
       const cand = best.slice(0, i).concat(best.slice(i, j + 1).reverse(), best.slice(j + 1));
@@ -50,6 +50,14 @@ export function reorderFrom(here, rest) {
     }
   }
   return best;
+}
+
+// Re-order the remaining stops from where the customer stands: their own section first.
+export function reorderFrom(here, rest) {
+  rest = rest.slice();
+  const mine = rest.findIndex(s => s.id === here.id);
+  if (mine >= 0) rest.unshift(rest.splice(mine, 1)[0]);
+  return orderStops(here.stop, rest, mine >= 0);
 }
 
 const isBack = x => x.stop[1] <= BACK + 1 || x.id === "nuts";

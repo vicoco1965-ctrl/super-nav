@@ -142,6 +142,14 @@ textarea{font:inherit;width:100%;min-height:96px;border-radius:10px;border:1px s
     <div id="pickBox" class="pick" hidden></div>
     <input type="file" id="signPhoto" class="vh" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
     <p class="status" id="whereStatus" role="status"></p>
+    <div class="row">
+      <button class="grow" id="muteBtn" type="button" aria-pressed="false">🔇 השתק</button>
+      <button class="grow" id="addBtn" type="button">➕ הוסף פריט</button>
+    </div>
+    <div class="row" id="addBox" hidden>
+      <input id="addText" class="grow" type="text" aria-label="מה להוסיף לרשימה" placeholder="למשל: טחינה" style="font:inherit;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--floor);color:var(--fg);padding:0 12px;min-width:0">
+      <button class="primary" id="addGo" type="button">הוסף</button>
+    </div>
     <div class="hands">
       <button id="handsBtn" type="button">🎙️ ידיים חופשיות</button>
       <span class="live" id="live">אמור "הבא", "שוב", "איפה הטחינה?" או "אני במעבר 8"</span>
@@ -286,6 +294,7 @@ function buildRoute() {
   const backUsed = Object.keys(groups).some(id => BYID[id].order > 2 && BYID[id].order <= BACK_ORDER);
   const rank = sec => sec.aisle ? (backUsed ? 10 + (15 - sec.aisle) : 10 + sec.aisle) : sec.id === "home" ? (backUsed ? 30 : 2.5) : sec.id === "beer" ? (backUsed ? 9 : 25) : sec.order;
   stops = Object.keys(groups).map(id => ({ section: BYID[id], items: groups[id] })).sort((a, b) => rank(a.section) - rank(b.section));
+  stops = orderStops(ENTRANCE, stops, CHECKOUT, false);
   stops.push({ section: { id: "checkout", where: "קופות השירות העצמי ואחריהן הקופות, בצד שמאל של החנות", stop: CHECKOUT, num: "✓" }, items: [], end: true });
   cur = 0; renderNav(); drawMap(); updateShare();
 }
@@ -346,7 +355,9 @@ function renderNav() {
 const NS = "http://www.w3.org/2000/svg";
 function el(tag, attrs, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
 // corridors the customer walks: right walkway, main walkway, back corridor, connector between them
-const CORR = [[[RIGHT, BACK], [RIGHT, 700]], [[SPINE, BACK], [SPINE, 640]], [[LEFT, BACK], [LEFT, 640]], [[LEFT, BACK], [330, BACK]], [[SPINE, CONNECT], [RIGHT, CONNECT]], [[LEFT, 640], [SPINE, 640]]];
+const CORR = [[[RIGHT, BACK], [RIGHT, 700]], [[SPINE, BACK], [SPINE, 640]], [[LEFT, BACK], [LEFT, 640]], [[LEFT, BACK], [330, BACK]], [[SPINE, CONNECT], [RIGHT, CONNECT]], [[LEFT, 640], [SPINE, 640]],
+  // every aisle row (and the beer row) is open end to end, so the route can cut across between the walls
+  [[LEFT, 161], [RIGHT, 161]], ...Array.from({ length: 14 }, (_, k) => [[LEFT, AY(k + 1)], [RIGHT, AY(k + 1)]])];
 function proj(p) {
   let best = null;
   for (const [a, b] of CORR) {
@@ -450,7 +461,15 @@ try { speechSynthesis.onvoiceschanged = pickVoice; pickVoice(); } catch (e) {}
 function voiceNote() {
   $("voiceNote").textContent = heVoice ? "קול: עברית של הטלפון." : tts ? "קול: עברית בקול של Claude." : "לא נמצא קול עברי במכשיר הזה. ההוראות מוצגות על המסך.";
 }
+let muted = false;
+function stopSpeaking() { try { speechSynthesis.cancel(); } catch (e) {} try { tts && tts.stop(); } catch (e) {} }
+function setMuted(on) {
+  muted = on; if (on) stopSpeaking();
+  $("muteBtn").textContent = on ? "🔊 החזר קול" : "🔇 השתק";
+  $("muteBtn").setAttribute("aria-pressed", String(on)); $("muteBtn").classList.toggle("primary", on);
+}
 async function speak(text) {
+  if (muted) return;
   if (heVoice) {
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.voice = heVoice; u.lang = heVoice.lang; u.rate = 0.95; speechSynthesis.speak(u); return; } catch (e) {}
   }
@@ -474,6 +493,8 @@ function command(text) {
   if (at) { const sec = whereFromWords(at[1]); if (sec) { relocate(sec); return; } }
   const ask = t.match(/^(?:איפה|איפוא|איפה יש|איפה נמצא(?:ת|ים|ות)?|אני צריך|אני צריכה|אני רוצה|תוסיף|תוסיפי|הוסף|תביא לי|תמצא לי|חפש)\s+(.+)$/);
   if (ask) { askFor(ask[1]); return; }
+  if (/^(שקט|השתק|עצור|תעצור|די)$/.test(t)) { setMuted(true); return; }
+  if (/^(דבר|תדבר|החזר קול|המשך הקראה)$/.test(t)) { setMuted(false); say(); return; }
   if (/^(הבא|הלאה|קדימה|לקחתי)/.test(t)) go(1);
   else if (/^(הקודם|אחורה)/.test(t)) go(-1);
   else if (/שוב|חזור על|מה לקחת/.test(t)) say();
@@ -540,7 +561,7 @@ async function askFor(phrase) {
   if (phrase.length > 3 && phrase[0] === "ה" && !startsKw(phrase) && matchSection(phrase.slice(1))) phrase = phrase.slice(1);
   const found = (await speechToItems(phrase))[0];
   const sec = found && BYID[found.section];
-  if (!sec) { speak(`לא מצאתי איפה נמצא ${phrase}. נסה לומר את זה במילים אחרות.`); return; }
+  if (!sec) { $("whereStatus").textContent = `לא מצאתי איפה נמצא "${phrase}". נסה במילים אחרות.`; speak(`לא מצאתי איפה נמצא ${phrase}. נסה לומר את זה במילים אחרות.`); return; }
   items.push({ name: found.name, section: sec.id }); renderItems();
   const idx = stops.findIndex((s, i) => i >= cur && s.section.id === sec.id);
   let stop;
@@ -548,8 +569,25 @@ async function askFor(phrase) {
   else stop = { section: sec, items: [found.name] };
   stops.splice(cur, 0, stop);
   here = null; renderNav(); updateShare();
+  $("whereStatus").textContent = `נוסף: ${found.name}, ב${sec.where}. זו התחנה הבאה שלך.`;
   speak(`${found.name} נמצא ב${sec.where}. ${stopText(cur).turn}.`);
 }
+// Mute and "add item" while navigating
+$("muteBtn").addEventListener("click", () => setMuted(!muted));
+let askMode = false;
+$("addBtn").addEventListener("click", () => {
+  stopSpeaking();
+  // always offer typing; also listen when the microphone is available
+  $("addBox").hidden = false;
+  if (dict) {
+    if (listening) { askMode = true; $("live").textContent = "מקשיב... אמור מה להוסיף, או הקלד"; return; }
+    askMode = true; $("live").textContent = "אמור מה להוסיף, למשל \"טחינה\", או הקלד";
+    dict.start().then(() => { $("addBtn").textContent = "🎤 מקשיב..."; }).catch(() => { askMode = false; $("addText").focus(); });
+  } else $("addText").focus();
+});
+function addTyped() { const v = $("addText").value.trim(); if (!v) return; $("addText").value = ""; $("addBox").hidden = true; if (askMode) { askMode = false; $("addBtn").textContent = "➕ הוסף פריט"; if (dict && !listening) dict.stop().catch(() => {}); } askFor(v); }
+$("addGo").addEventListener("click", addTyped);
+$("addText").addEventListener("keydown", e => { if (e.key === "Enter") addTyped(); });
 // "Say the list" on the list screen
 let listMode = false, heard = [];
 $("sayListBtn").addEventListener("click", () => {
@@ -672,21 +710,18 @@ function whereFromWords(w) {
 })();
 let here = null; // section the customer was last seen at
 const pathLen = (a, b) => { const p = leg(a, b); let d = 0; for (let i = 1; i < p.length; i++) d += Math.abs(p[i][0] - p[i - 1][0]) + Math.abs(p[i][1] - p[i - 1][1]); return d; };
-function relocate(sec) {
-  here = sec;
-  // remaining stops, re-ordered from where the customer stands: their own section first, then nearest next
-  const done = stops.slice(0, cur), end = stops[stops.length - 1];
-  let rest = stops.slice(cur, -1), ordered = [], pos = sec.stop;
-  const mine = rest.findIndex(s => s.section.id === sec.id);
-  if (mine >= 0) { ordered.push(rest[mine]); rest.splice(mine, 1); }
+// Order stops for the shortest walk from `start` to `endPos`: nearest-next, then 2-opt to undo detours.
+// lockFirst keeps stop 0 in place (the section the customer is standing in).
+function orderStops(start, list, endPos, lockFirst) {
+  let rest = list.slice(), ordered = [], pos = start;
+  if (lockFirst && rest.length) { ordered.push(rest.shift()); pos = ordered[0].section.stop; }
   while (rest.length) {
     let bi = 0, bd = Infinity;
     rest.forEach((s, i) => { const d = pathLen(pos, s.section.stop); if (d < bd) { bd = d; bi = i; } });
     pos = rest[bi].section.stop; ordered.push(rest.splice(bi, 1)[0]);
   }
-  // tidy the greedy order with 2-opt so the walk doesn't double back
-  const cost = seq => { let d = 0, p = sec.stop; for (const x of seq) { d += pathLen(p, x.section.stop); p = x.section.stop; } return d + pathLen(p, end.section.stop); };
-  const lock = mine >= 0 ? 1 : 0;
+  const cost = seq => { let d = 0, p = start; for (const x of seq) { d += pathLen(p, x.section.stop); p = x.section.stop; } return d + pathLen(p, endPos); };
+  const lock = lockFirst ? 1 : 0;
   for (let improved = true, rounds = 0; improved && rounds < 50; rounds++) {
     improved = false;
     for (let i = lock; i < ordered.length - 1; i++) for (let j = i + 1; j < ordered.length; j++) {
@@ -694,7 +729,16 @@ function relocate(sec) {
       if (cost(cand) < cost(ordered) - 0.5) { ordered = cand; improved = true; }
     }
   }
-  stops = done.concat(ordered, [end]);
+  return ordered;
+}
+function relocate(sec) {
+  here = sec;
+  // remaining stops, re-ordered from where the customer stands: their own section first, then nearest next
+  const done = stops.slice(0, cur), end = stops[stops.length - 1];
+  let rest = stops.slice(cur, -1);
+  const mine = rest.findIndex(s => s.section.id === sec.id);
+  if (mine >= 0) rest.unshift(rest.splice(mine, 1)[0]);
+  stops = done.concat(orderStops(sec.stop, rest, end.section.stop, mine >= 0), [end]);
   renderNav(); updateShare(); say();
 }
 async function onSignPhoto(e) {
@@ -790,7 +834,11 @@ function browserDictation() {
 function wireDictation(d) {
   dict = d;
   if (!d) { $("handsBtn").hidden = true; $("sayListBtn").hidden = true; $("live").textContent = "בדפדפן הזה אין פקודות קוליות. הכפתורים הגדולים עובדים בכל מקום."; return; }
-  d.onFinal(({ text }) => { if (listMode) { heard.push(text); status("שמעתי: " + heard.join(" ")); } else command(text); });
+  d.onFinal(({ text }) => {
+    if (listMode) { heard.push(text); status("שמעתי: " + heard.join(" ")); return; }
+    if (askMode) { askMode = false; $("addBtn").textContent = "➕ הוסף פריט"; $("addBox").hidden = true; if (!listening) d.stop().catch(() => {}); askFor(text); return; }
+    command(text);
+  });
   d.onPartial(({ text }) => { if (listMode) status("שמעתי: " + heard.concat([text]).join(" ")); });
   d.onState(({ state }) => { if (state === "idle") { if (listening) setListening(false); if (listMode) finishListMode(); } });
 }

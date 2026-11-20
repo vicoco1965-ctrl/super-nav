@@ -83,7 +83,9 @@ function matchSection(item) {
 }
 
 // corridors the customer walks: right walkway, main walkway, back corridor, connector between them
-const CORR = [[[RIGHT, BACK], [RIGHT, 700]], [[SPINE, BACK], [SPINE, 640]], [[LEFT, BACK], [LEFT, 640]], [[LEFT, BACK], [330, BACK]], [[SPINE, CONNECT], [RIGHT, CONNECT]], [[LEFT, 640], [SPINE, 640]]];
+const CORR = [[[RIGHT, BACK], [RIGHT, 700]], [[SPINE, BACK], [SPINE, 640]], [[LEFT, BACK], [LEFT, 640]], [[LEFT, BACK], [330, BACK]], [[SPINE, CONNECT], [RIGHT, CONNECT]], [[LEFT, 640], [SPINE, 640]],
+  // every aisle row (and the beer row) is open end to end, so the route can cut across between the walls
+  [[LEFT, 161], [RIGHT, 161]], ...Array.from({ length: 14 }, (_, k) => [[LEFT, AY(k + 1)], [RIGHT, AY(k + 1)]])];
 function proj(p) {
   let best = null;
   for (const [a, b] of CORR) {

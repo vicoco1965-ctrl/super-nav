@@ -8,7 +8,7 @@
 |---|---|
 | `site/` | אתר הניווט (קובץ `index.html` אחד, וזיהוי טקסט בטלפון ב-`vendor/`). `handoff.js` טוען רשימה שהגיעה מהבוט (`/#l=...`). |
 | `bot/src/` | בוט הוואטסאפ: Cloudflare Worker שמקבל הודעות מ-Meta ועונה. |
-| `bot/src/store-core.js` | מפת הסניף ופענוח הרשימות, **מועתקים אוטומטית** מ-`site/index.html`. אחרי שינוי באתר: `npm run sync-store`. |
+| `bot/src/store-core.js` | מפת הסניף ופענוח הרשימות, **מועתקים אוטומטית** מ-`site/index.html`. אחרי שינוי באתר: `npm run sync-store` (also rebuilds `bot/src/distances.js`, the walking distances between stops). |
 | `wrangler.toml` | הגדרות ה-Worker: הבוט + האתר באותה כתובת. |
 
 ## איך זה רץ

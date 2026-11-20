@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildCore } from "../scripts/extract-store.mjs";
+import { buildCore, buildDistances } from "../scripts/extract-store.mjs";
 import { handle, navLink, unknownNames } from "../src/bot.js";
 import { parseCommand, textToItems } from "../src/route.js";
 
@@ -11,6 +11,11 @@ const run = (msgs, start) => { let st = start || null, now = 1e12, out = []; for
 test("store-core.js matches site/index.html (run npm run sync-store)", () => {
   const html = readFileSync(new URL("../../site/index.html", import.meta.url), "utf8");
   assert.equal(readFileSync(new URL("../src/store-core.js", import.meta.url), "utf8"), buildCore(html));
+});
+
+test("distances.js matches the map (run npm run sync-store)", async () => {
+  const want = await buildDistances(new URL("../src/store-core.js", import.meta.url).href);
+  assert.equal(readFileSync(new URL("../src/distances.js", import.meta.url), "utf8"), want);
 });
 
 test("run-on Hebrew list with no separators", () => {
