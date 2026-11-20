@@ -119,6 +119,7 @@ textarea{font:inherit;width:100%;min-height:96px;border-radius:10px;border:1px s
     </div>
     <p class="status" id="status" role="status"></p>
     <ul class="items" id="items"></ul>
+    <p class="note" id="emptyNote">הרשימה ריקה. צלם, אמור או הקלד את רשימת הקניות. <button type="button" id="sampleBtn" style="min-height:0;padding:2px 8px;font-size:14px">נסה רשימה לדוגמה</button></p>
     <button class="primary bignext" id="startBtn" type="button">התחל ניווט ▸</button>
   </section>
 
@@ -137,6 +138,7 @@ textarea{font:inherit;width:100%;min-height:96px;border-radius:10px;border:1px s
       <button class="grow" id="prevBtn" type="button">◂ הקודם</button>
       <button class="grow" id="repeatBtn" type="button">🔊 שוב</button>
       <button class="primary grow bignext" id="nextBtn" type="button">הבא ▸</button>
+      <button class="primary grow bignext" id="finishBtn" type="button" hidden>🏁 סיימתי, קנייה חדשה</button>
     </div>
     <div class="row">
       <button class="grow" id="whereBtn" type="button" data-input="signPhoto">📷 צלם שלט (ניסיוני)</button>
@@ -269,6 +271,7 @@ function setItems(names, sections) {
 const $ = id => document.getElementById(id);
 function renderItems() {
   const ul = $("items"); ul.textContent = "";
+  $("emptyNote").hidden = items.length > 0;
   $("exampleBadge").hidden = !isExample;
   items.forEach((it, i) => {
     const li = document.createElement("li");
@@ -351,6 +354,8 @@ function renderNav() {
   $("progress").textContent = s.end ? `${total} מתוך ${total} תחנות` : `תחנה ${cur + 1} מתוך ${total}`;
   $("prevBtn").disabled = cur === 0;
   $("nextBtn").disabled = cur >= stops.length - 1;
+  const atEnd = !!(stops[cur] && stops[cur].end) && stops.length > 1;
+  $("nextBtn").hidden = atEnd; $("finishBtn").hidden = !atEnd;
   drawMap();
 }
 
@@ -497,6 +502,7 @@ function command(text) {
   const ask = t.match(/^(?:איפה|איפוא|איפה יש|איפה נמצא(?:ת|ים|ות)?|אני צריך|אני צריכה|אני רוצה|תוסיף|תוסיפי|הוסף|תביא לי|תמצא לי|חפש)\s+(.+)$/);
   if (ask) { askFor(ask[1]); return; }
   if (/^(שקט|השתק|עצור|תעצור|די)$/.test(t)) { setMuted(true); return; }
+  if (/^(סיימתי|סיימנו|סיום|קנייה חדשה)$/.test(t) && stops[cur] && stops[cur].end) { resetAll(); return; }
   if (/^(דבר|תדבר|החזר קול|המשך הקראה)$/.test(t)) { setMuted(false); say(); return; }
   if (/^(הבא|הלאה|קדימה|לקחתי)/.test(t)) go(1);
   else if (/^(הקודם|אחורה)/.test(t)) go(-1);
@@ -735,6 +741,24 @@ function shrink(file) {
   });
 }
 
+// ---------- Finish: clear everything for the next shopping trip ----------
+function resetAll() {
+  stopSpeaking();
+  if (listMode) { listMode = false; }
+  if (dict && listening) { try { dict.stop(); } catch (e) {} setListening(false); }
+  if (typeof addRec !== "undefined" && addRec) { try { addRec.abort(); } catch (e) {} }
+  askMode = false; here = null; heard = []; muted = false; setMuted(false);
+  isExample = false; items = [];
+  for (const id of ["listText", "addText"]) $(id).value = "";
+  for (const id of ["pasteBox", "addBox", "pickBox"]) $(id).hidden = true;
+  status(""); $("whereStatus").textContent = ""; $("live").textContent = "אמור \"הבא\", \"שוב\", \"איפה הטחינה?\" או \"אני במעבר 8\"";
+  // drop a list that came in the link (from WhatsApp), so reopening the page starts clean
+  try { if (location.hash) history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+  setItems([]);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  status("הקנייה הסתיימה. אפשר להתחיל רשימה חדשה.");
+}
+
 // ---------- Where am I: tap, say, or photograph ----------
 const HEB_NUM = { "אחד": 1, "אחת": 1, "שתיים": 2, "שניים": 2, "שתים": 2, "שלוש": 3, "שלושה": 3, "ארבע": 4, "ארבעה": 4, "חמש": 5, "חמישה": 5, "שש": 6, "שישה": 6, "שבע": 7, "שבעה": 7, "שמונה": 8, "תשע": 9, "תשעה": 9, "עשר": 10, "עשרה": 10, "אחת עשרה": 11, "אחד עשר": 11, "שתים עשרה": 12, "שנים עשר": 12, "שתיים עשרה": 12, "שלוש עשרה": 13, "שלושה עשר": 13, "ארבע עשרה": 14, "ארבעה עשר": 14 };
 function whereFromWords(w) {
@@ -886,7 +910,11 @@ function wireDictation(d) {
 }
 
 // ---------- Boot ----------
-setItems(splitList(SAMPLE));
+// a new visit always starts with an empty list (nothing is kept from an earlier trip)
+isExample = false;
+setItems([]);
+$("sampleBtn").addEventListener("click", () => { isExample = true; setItems(splitList(SAMPLE)); });
+$("finishBtn").addEventListener("click", resetAll);
 if (window.claude && window.claude.use) {
   window.claude.use("sample").then(s => { sample = s; if (s) s.limits().then(l => { if (!l || !l.images) sample = null; }).catch(() => {}); });
   window.claude.use("tts").then(t => { tts = t; voiceNote(); });
