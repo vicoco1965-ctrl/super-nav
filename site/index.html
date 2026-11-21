@@ -2256,7 +2256,7 @@ async function loadStats() {
   try {
     const r = await fetch(new URL("api/stores/" + encodeURIComponent(mSpec.slug) + "/stats", siteBase()), { headers: { "Authorization": "Bearer " + token } });
     if (!r.ok) return; const s = await r.json(), t = s.total || {};
-    $("mStats").textContent = `📊 שימוש בסניף: נפתח ${t.open || 0} פעמים, ${t.start || 0} התחילו ניווט, ${t.finish || 0} סיימו קנייה.` + (s.last7 ? ` בשבוע האחרון: ${s.last7.open || 0} כניסות.` : "");
+    $("mStats").textContent = `📊 שימוש בסניף: נפתח ${t.open || 0} פעמים, ${t.start || 0} התחילו ניווט, ${t.finish || 0} סיימו קנייה, ${t.share || 0} שיתפו חברים.` + (s.last7 ? ` בשבוע האחרון: ${s.last7.open || 0} כניסות.` : "");
   } catch (e) {}
 }
 const PUBLIC_SITE = "";   // the public site address, once it is live (e.g. https://super-nav.example.workers.dev/)
