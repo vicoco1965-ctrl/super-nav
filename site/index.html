@@ -129,6 +129,9 @@ body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding
 #addText{font:inherit;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--floor);color:var(--fg);padding:0 12px;min-width:0}
 .appnote{margin:6px 0;padding:10px 12px;border-radius:12px;background:var(--tag);color:var(--tag-fg);font-size:15px;line-height:1.45}
 .appnote button{margin-top:8px;min-height:40px;font-size:15px}
+.map3d{position:absolute;inset:0;touch-action:none}
+.map3d canvas{display:block}
+.floatbtn.mode{inset-inline-start:auto;inset-inline-end:10px}
 .map .wall{fill:none;stroke:var(--muted);stroke-width:2}
 .hands{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .live{font-size:14px;color:var(--muted)}
@@ -183,7 +186,9 @@ body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding
     </div>
     <div class="mapwrap">
       <svg class="map" id="map" viewBox="0 0 360 700" preserveAspectRatio="xMidYMid meet" role="img" aria-label="מפת סניף יוחננוף באר שבע עם המסלול"></svg>
+      <div id="map3d" class="map3d" hidden></div>
       <button id="zoomBtn" class="floatbtn" type="button">🗺️ כל החנות</button>
+      <button id="modeBtn" class="floatbtn mode" type="button">👁️ גובה העיניים</button>
       <div class="bubble" id="bubble" hidden><div id="bubbleYou"></div><div id="bubbleMe"></div></div>
     </div>
     <div class="navbottom">
@@ -416,11 +421,12 @@ function renderNav() {
   const atEnd = !!(stops[cur] && stops[cur].end) && stops.length > 1;
   $("nextBtn").hidden = atEnd; $("finishBtn").hidden = !atEnd;
   drawMap(); renderSteps(); fitMap();
+  if (view3d && mapMode !== "2d") update3d();
 }
 
 // ---------- Map ----------
 const NS = "http://www.w3.org/2000/svg";
-let lastLeg = null; // the walk to the current stop, for the map zoom
+let lastLeg = null, lastRoute = null; // the walk to the current stop, for the map zoom
 function el(tag, attrs, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
 // corridors the customer walks: right walkway, main walkway, back corridor, connector between them
 const CORR = [[[RIGHT, BACK], [RIGHT, 700]], [[SPINE, BACK], [SPINE, 640]], [[LEFT, BACK], [LEFT, 640]], [[LEFT, BACK], [330, BACK]], [[SPINE, CONNECT], [RIGHT, CONNECT]], [[LEFT, 640], [SPINE, 640]],
@@ -503,6 +509,7 @@ function drawMap() {
     all = all.concat(i ? L.slice(1) : L);
     if (i === cur) curLeg = L;
   }
+  lastRoute = all;
   m.appendChild(el("polyline", { points: pts(all), class: "route" }));
   if (here && stops[cur]) curLeg = leg(here.stop, stops[cur].section.stop);
   lastLeg = curLeg || (stops[cur] ? [stops[cur].section.stop] : null);
@@ -987,6 +994,8 @@ function wireDictation(d) {
 function enterNav() {
   $("navPanel").hidden = false; document.body.classList.add("navmode");
   $("drawer").open = false; mapZoomAll = false; window.scrollTo(0, 0);
+  if (view3d) view3d.overview = false;
+  start3d();
   try { navigator.wakeLock && navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
 }
 function exitNav() {
@@ -1025,7 +1034,8 @@ function legBox(L) {
 }
 function fitMap() {
   const target = mapZoomAll ? FULL : legBox(lastLeg);
-  $("zoomBtn").textContent = mapZoomAll ? "🔍 הקטע הנוכחי" : "🗺️ כל החנות";
+  const all = view3d && mapMode !== "2d" ? view3d.overview : mapZoomAll;
+  $("zoomBtn").textContent = all ? "🔍 הקטע הנוכחי" : "🗺️ כל החנות";
   const from = viewNow.slice(), t0 = performance.now(), dur = matchMedia("(prefers-reduced-motion: reduce)").matches || $("navPanel").hidden ? 0 : 450;
   cancelAnimationFrame(viewAnim);
   const step = now => {
@@ -1037,7 +1047,10 @@ function fitMap() {
   step(t0);
 }
 $("drawer").addEventListener("toggle", () => { if ($("drawer").open) $("bubble").hidden = true; else fitMap(); });
-$("zoomBtn").addEventListener("click", () => { mapZoomAll = !mapZoomAll; fitMap(); });
+$("zoomBtn").addEventListener("click", () => {
+  if (view3d && mapMode !== "2d") { view3d.overview = !view3d.overview; $("zoomBtn").textContent = view3d.overview ? "🔍 הקטע הנוכחי" : "🗺️ כל החנות"; aimCamera(); return; }
+  mapZoomAll = !mapZoomAll; fitMap();
+});
 addEventListener("resize", () => { if (!$("navPanel").hidden) fitMap(); });
 
 // ---------- Talk with the app: speak, it understands, moves the map and answers out loud ----------
@@ -1313,6 +1326,259 @@ function noVoiceHere(noMic, noSpeaker) {
   }
   if (noMic) { $("talkLbl").textContent = "אין מיקרופון"; $("talkBtn").setAttribute("aria-disabled", "true"); }
 }
+
+// ---------- 3D map: colored shelves with department icons, a camera that follows the route ----------
+// Drawn on the phone itself with three.js (vendor/three.min.js); falls back to the flat map if 3D can't run.
+const DEPT_COLOR = { produce: 0x5fb34a, greens: 0x2f8f46, nuts: 0xb07a3c, dairy: 0x5aa9e6, ddeli: 0x7fb8e0, bakery: 0xe2a849, meat: 0xc8453c,
+  frozen: 0x8fd3e8, drinks: 0x8a62c9, home: 0x9aa3a0, beer: 0xd9a21b };
+const AISLE_COLOR = [0xe76f51, 0xf4a261, 0x8e5a3c, 0xe9c46a, 0xc9b28a, 0x6c8ebf, 0xb8b8b8, 0xd96c8c, 0x4fb0c6, 0x7ac7a5, 0x3d9ad1, 0x5d7c99, 0xd1a35c, 0x8c2f4a];
+const DEPT_H = { produce: 7, greens: 20, nuts: 13, dairy: 22, ddeli: 12, bakery: 14, meat: 13, frozen: 7, drinks: 20, home: 14, beer: 14 };
+let view3d = null;           // {renderer, scene, camera, ...} once built
+let mapMode = "3d";          // "3d" (above), "eye" (eye level) or "2d" (flat)
+let three3dFailed = false;
+function loadThree() {
+  if (window.THREE) return Promise.resolve(window.THREE);
+  return new Promise((res, rej) => {
+    const sc = document.createElement("script"); sc.src = "vendor/three.min.js";
+    sc.onload = () => window.THREE ? res(window.THREE) : rej(new Error("no three"));
+    sc.onerror = rej; document.head.appendChild(sc);
+  });
+}
+function label(T, text, opts = {}) {
+  const c = document.createElement("canvas"), g = c.getContext("2d"), s = 4;   // high-res for sharp text
+  const font = `700 ${opts.size || 26}px Assistant, Arial, sans-serif`;
+  g.font = font; const w = Math.ceil(g.measureText(text).width) + 28, h = (opts.size || 26) + 20;
+  c.width = w * s; c.height = h * s; g.scale(s, s); g.font = font; g.direction = "rtl"; g.textAlign = "center"; g.textBaseline = "middle";
+  const r = h / 2;
+  g.fillStyle = opts.bg || "rgba(255,255,255,0.94)";
+  g.beginPath(); g.moveTo(r, 0); g.lineTo(w - r, 0); g.arc(w - r, r, r, -Math.PI / 2, Math.PI / 2); g.lineTo(r, h); g.arc(r, r, r, Math.PI / 2, Math.PI * 1.5); g.fill();
+  if (opts.border) { g.strokeStyle = opts.border; g.lineWidth = 3; g.stroke(); }
+  g.fillStyle = opts.fg || "#1c1f1d"; g.fillText(text, w / 2, h / 2 + 1);
+  const tex = new T.CanvasTexture(c); tex.anisotropy = 4; tex.minFilter = T.LinearFilter;
+  const sp = new T.Sprite(new T.SpriteMaterial({ map: tex, depthTest: opts.depthTest !== false, transparent: true }));
+  const k = (opts.scale || 0.42); sp.scale.set(w * k, h * k, 1);
+  if (opts.depthTest === false) sp.renderOrder = 10;
+  return sp;
+}
+function build3d(T) {
+  const host = $("map3d");
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "low-power" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  host.appendChild(renderer.domElement);
+  const scene = new T.Scene(); scene.background = new T.Color(0xdfe8ee);
+  scene.fog = new T.Fog(0xdfe8ee, 500, 1100);
+  const camera = new T.PerspectiveCamera(50, 1, 2, 3000);
+  scene.add(new T.HemisphereLight(0xffffff, 0x8a9a92, 0.85));
+  const sun = new T.DirectionalLight(0xffffff, 0.55); sun.position.set(-200, 400, 300); scene.add(sun);
+  const box = (x, z, w, d, h, color, y0 = 0) => {
+    const m = new T.Mesh(new T.BoxGeometry(w, h, d), new T.MeshLambertMaterial({ color }));
+    m.position.set(x + w / 2, y0 + h / 2, z + d / 2); scene.add(m); return m;
+  };
+  // floor and walls
+  const floor = new T.Mesh(new T.PlaneGeometry(340, 650), new T.MeshLambertMaterial({ color: 0xf3f5f2 }));
+  floor.rotation.x = -Math.PI / 2; floor.position.set(180, 0, 335); scene.add(floor);
+  const wallC = 0xc4ccc7;
+  box(8, 8, 344, 3, 12, wallC); box(8, 658, 210, 3, 12, wallC); box(8, 8, 3, 653, 12, wallC); box(349, 8, 3, 653, 12, wallC);
+  // promo foyer
+  box(230, 596, 115, 60, 1.2, 0xeadfc6);
+  const tags = [];
+  const addTag = (sp, x, y, z) => { sp.position.set(x, y, z); scene.add(sp); tags.push(sp); return sp; };
+  addTag(label(T, "▲ כניסה", { bg: "rgba(15,107,82,0.95)", fg: "#fff" }), 300, 14, 680);
+  // departments: colored blocks with an icon and a name floating above
+  const highlight = {};
+  for (const s of SECTIONS) {
+    const r = s.rect || s.row; if (!r) continue;
+    const color = DEPT_COLOR[s.id] || 0xa0b0a8, h = DEPT_H[s.id] || 12;
+    const parts = [];
+    if (s.row) { // beer: shelves on both sides of the row
+      parts.push(box(r[0], r[1], r[2], 4, h, color), box(r[0], r[1] + r[3] - 4, r[2], 4, h, color));
+    } else parts.push(box(r[0], r[1], r[2], r[3], h, color));
+    for (const extra of [s.side, s.rect2]) if (extra) parts.push(box(extra[0], extra[1], extra[2], extra[3], h, color));
+    highlight[s.id] = { parts, color, rect: r };
+    const cx = r[0] + r[2] / 2, cz = r[1] + r[3] / 2;
+    addTag(label(T, `${s.num} ${s.short.replace(" ?", "")}`, { border: "#" + color.toString(16).padStart(6, "0") }), cx, h + 16, cz);
+  }
+  // aisles: two shelf runs per row, colored per aisle, with the yellow-red aisle number like the store's signs
+  for (let i = 1; i <= 14; i++) {
+    const y = AY(i), s = BYID["a" + i], color = AISLE_COLOR[i - 1];
+    const parts = [box(70, y + 6, 57, 6, 15, color), box(143, y + 6, 72, 6, 15, color)];
+    highlight[s.id] = { parts, color, rect: [70, y - 8, 145, 16] };
+    addTag(label(T, String(i), { bg: "#ffd200", fg: "#c4161c", border: "#c4161c", size: 30, scale: 0.36 }), 100, 30, y);
+    addTag(label(T, s.short, { size: 20, scale: 0.34, fg: s.est ? "#b5481d" : "#2b302d" }), 182, 24, y);
+  }
+  // checkouts
+  box(14, 522, 30, 50, 9, 0x8f9a95); box(14, 576, 30, 78, 9, 0x6f7a75);
+  addTag(label(T, "🛒 קופות", {}), 29, 26, 590);
+  // dynamic layer: route, stops, you
+  const dyn = new T.Group(); scene.add(dyn);
+  const glow = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.55, depthWrite: false }));
+  glow.rotation.x = -Math.PI / 2; glow.position.y = 0.3; scene.add(glow);
+  view3d = { T, renderer, scene, camera, dyn, glow, highlight, tags, host, cam: null, camFrom: null, camT: 1, chevrons: [], pin: null, you: null, raf: 0, lastFrame: 0, overview: false };
+  const ro = new ResizeObserver(() => size3d()); ro.observe(host);
+  size3d();
+}
+function size3d() {
+  const v = view3d; if (!v) return;
+  const w = v.host.clientWidth, h = v.host.clientHeight; if (!w || !h) return;
+  v.renderer.setSize(w, h, false); v.renderer.domElement.style.width = "100%"; v.renderer.domElement.style.height = "100%";
+  v.camera.aspect = w / h; v.camera.updateProjectionMatrix(); tick3d(true);
+}
+// ribbon along a path on the floor
+function ribbon(T, path, width, color, y, opacity = 1) {
+  const g = new T.Group();
+  const mat = new T.MeshBasicMaterial({ color, transparent: opacity < 1, opacity });
+  for (let i = 1; i < path.length; i++) {
+    const [x0, z0] = path[i - 1], [x1, z1] = path[i], len = Math.hypot(x1 - x0, z1 - z0); if (len < 0.5) continue;
+    const m = new T.Mesh(new T.BoxGeometry(len + width, 0.4, width), mat);
+    m.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); m.rotation.y = -Math.atan2(z1 - z0, x1 - x0); g.add(m);
+  }
+  return g;
+}
+function update3d() {
+  const v = view3d; if (!v || !stops.length) return;
+  const T = v.T;
+  // clear the dynamic layer
+  for (const o of v.dyn.children.slice()) { v.dyn.remove(o); o.traverse(n => { if (n.geometry) n.geometry.dispose(); if (n.material) { if (n.material.map) n.material.map.dispose(); n.material.dispose(); } }); }
+  v.chevrons = [];
+  // highlight the current department in yellow
+  const curId = stops[cur] && stops[cur].section.id;
+  for (const id in v.highlight) { const hl = v.highlight[id]; for (const p of hl.parts) p.material.color.setHex(id === curId ? 0xffd84a : hl.color); }
+  const hl = v.highlight[curId];
+  if (hl) { const r = hl.rect; v.glow.visible = true; v.glow.scale.set(r[2] + 16, r[3] + 16, 1); v.glow.position.set(r[0] + r[2] / 2, 0.3, r[1] + r[3] / 2); } else v.glow.visible = false;
+  // the whole route faintly, the walk to the current stop in bold red with moving arrows
+  v.faint = null;
+  if (lastRoute && lastRoute.length > 1) { v.faint = ribbon(T, lastRoute, 2.2, 0x7d948a, 0.35, 0.55); v.dyn.add(v.faint); }
+  const L = lastLeg && lastLeg.length > 1 ? lastLeg : null;
+  if (L) {
+    v.dyn.add(ribbon(T, L, 6, 0xd62839, 0.6));
+    const shape = new T.Shape(); shape.moveTo(0, 2.6); shape.lineTo(2.4, -1.6); shape.lineTo(0, -0.4); shape.lineTo(-2.4, -1.6); shape.lineTo(0, 2.6);
+    const cg = new T.ShapeGeometry(shape), cm = new T.MeshBasicMaterial({ color: 0xffffff });
+    let total = 0; const segs = [];
+    for (let i = 1; i < L.length; i++) { const len = Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); segs.push({ a: L[i - 1], b: L[i], len, at: total }); total += len; }
+    const n = Math.max(2, Math.floor(total / 16));
+    for (let k = 0; k < n; k++) { const m = new T.Mesh(cg, cm); m.rotation.x = -Math.PI / 2; v.dyn.add(m); v.chevrons.push(m); }
+    v.legSegs = segs; v.legLen = total;
+  } else { v.legSegs = null; }
+  // stops
+  stops.forEach((s, i) => {
+    const [x, z] = s.section.stop, isCur = i === cur, done = i < cur;
+    const disc = new T.Mesh(new T.CylinderGeometry(isCur ? 6 : 4.5, isCur ? 6 : 4.5, 1, 24), new T.MeshLambertMaterial({ color: done ? 0x9fb3aa : isCur ? 0xd62839 : 0xffffff }));
+    disc.position.set(x, 0.8, z); v.dyn.add(disc);
+    if (!isCur) { const t = label(T, s.end ? "✓" : String(i + 1), { size: 22, scale: 0.3, bg: done ? "rgba(159,179,170,0.95)" : "rgba(255,255,255,0.95)", border: done ? null : "#0f6b52" }); t.position.set(x, 9, z); v.dyn.add(t); }
+  });
+  // big red pin over the current stop
+  const cs = stops[cur];
+  if (cs) {
+    const pin = new T.Group();
+    const head = new T.Mesh(new T.SphereGeometry(5.5, 20, 14), new T.MeshLambertMaterial({ color: 0xd62839 }));
+    const cone = new T.Mesh(new T.ConeGeometry(4.2, 11, 20), new T.MeshLambertMaterial({ color: 0xd62839 }));
+    cone.rotation.x = Math.PI; cone.position.y = -6.5; pin.add(head, cone);
+    const num = label(T, cs.end ? "✓" : String(cur + 1), { size: 26, scale: 0.32, bg: "#d62839", fg: "#fff", depthTest: false }); num.position.y = 12; pin.add(num);
+    pin.position.set(cs.section.stop[0], 20, cs.section.stop[1]); v.dyn.add(pin); v.pin = pin;
+  }
+  // you: where this walk starts
+  const start = here ? here.stop : L ? L[0] : ENTRANCE;
+  const you = new T.Group();
+  const dot = new T.Mesh(new T.SphereGeometry(4, 20, 14), new T.MeshLambertMaterial({ color: 0x2f7fe0, emissive: 0x0b2a55 }));
+  dot.position.y = 4.5;
+  const ring = new T.Mesh(new T.RingGeometry(6, 8, 32), new T.MeshBasicMaterial({ color: 0x2f7fe0, transparent: true, opacity: 0.5, side: T.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.7;
+  const yl = label(T, "אתה כאן", { size: 20, scale: 0.3, bg: "#2f7fe0", fg: "#fff", depthTest: false }); yl.position.y = 15;
+  you.add(dot, ring, yl); you.position.set(start[0], 0, start[1]); v.dyn.add(you); v.you = you; v.youRing = ring;
+  aimCamera();
+}
+// where the camera should be: behind the shopper, looking along the walk ("3d"), at eye height ("eye"), or the whole store
+function aimCamera() {
+  const v = view3d; if (!v) return;
+  const L = lastLeg && lastLeg.length > 1 ? lastLeg : [ENTRANCE, stops[cur] ? stops[cur].section.stop : ENTRANCE];
+  const S = here ? here.stop : L[0], E = L[L.length - 1];
+  let pos, tgt, fov = 50;
+  if (v.overview) {
+    pos = [180, 560, 900]; tgt = [180, 0, 330];
+  } else if (mapMode === "eye") {
+    // stand at the start, look toward the first turn of the walk
+    let k = 1; while (k < L.length - 1 && Math.hypot(L[k][0] - S[0], L[k][1] - S[1]) < 12) k++;
+    const P = L[Math.min(k, L.length - 1)];
+    let dx = P[0] - S[0], dz = P[1] - S[1], d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
+    pos = [S[0] - dx * 6, 22, S[1] - dz * 6]; tgt = [S[0] + dx * 80, 4, S[1] + dz * 80]; fov = 66;
+  } else {
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+    for (const [x, z] of L) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, span = Math.max(x1 - x0, z1 - z0, 90);
+    let dx = E[0] - S[0], dz = E[1] - S[1], d = Math.hypot(dx, dz);
+    if (d < 1) { dx = 0; dz = -1; d = 1; } dx /= d; dz /= d;
+    const dist = span * 1.25 + 60;
+    pos = [cx - dx * dist * 0.62, dist * 0.78, cz - dz * dist * 0.62]; tgt = [cx + dx * 10, 0, cz + dz * 10];
+  }
+  v.camFrom = v.cam ? { pos: v.cam.pos.slice(), tgt: v.cam.tgt.slice(), fov: v.cam.fov } : { pos, tgt, fov };
+  v.camTo = { pos, tgt, fov }; v.camT = 0; v.camStart = performance.now();
+  if (!v.cam) v.cam = { pos: pos.slice(), tgt: tgt.slice(), fov };
+  run3d();
+}
+function tick3d(force) {
+  const v = view3d; if (!v) return;
+  const now = performance.now();
+  if (v.camT < 1) {
+    v.camT = Math.min(1, (now - v.camStart) / 900);
+    const e = v.camT < 0.5 ? 2 * v.camT * v.camT : 1 - Math.pow(-2 * v.camT + 2, 2) / 2;
+    const mix = (a, b) => a.map((x, i) => x + (b[i] - x) * e);
+    v.cam = { pos: mix(v.camFrom.pos, v.camTo.pos), tgt: mix(v.camFrom.tgt, v.camTo.tgt), fov: v.camFrom.fov + (v.camTo.fov - v.camFrom.fov) * e };
+  }
+  if (v.cam) { v.camera.position.set(...v.cam.pos); v.camera.lookAt(...v.cam.tgt); if (v.camera.fov !== v.cam.fov) { v.camera.fov = v.cam.fov; v.camera.updateProjectionMatrix(); } }
+  // gentle motion: pin bobs, arrows flow toward the stop, the "you" ring pulses
+  const t = now / 1000, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (v.pin) v.pin.position.y = 20 + (still ? 0 : Math.sin(t * 3) * 2);
+  // at eye level you are the camera: hide your own marker and the signs right on top of you
+  const eye = mapMode === "eye" && !v.overview;
+  if (v.you) v.you.visible = !eye;
+  if (eye !== v.wasEye || eye) { const cp = v.camera.position; for (const sp of v.tags) sp.visible = !eye || Math.hypot(sp.position.x - cp.x, sp.position.z - cp.z) > 70; if (v.faint) v.faint.visible = !eye; v.wasEye = eye; }
+  if (v.youRing) { const k = still ? 1 : 1 + 0.25 * Math.sin(t * 4); v.youRing.scale.set(k, k, k); }
+  if (v.legSegs && v.chevrons.length) {
+    const n = v.chevrons.length, gap = v.legLen / n, off = still ? 0 : (t * 14) % gap;
+    v.chevrons.forEach((m, k) => {
+      let at = k * gap + off; const sg = v.legSegs.find(s => at >= s.at && at <= s.at + s.len) || v.legSegs[v.legSegs.length - 1];
+      const f = sg.len ? (at - sg.at) / sg.len : 0, x = sg.a[0] + (sg.b[0] - sg.a[0]) * f, z = sg.a[1] + (sg.b[1] - sg.a[1]) * f;
+      m.position.set(x, 0.9, z); m.rotation.z = Math.atan2(-(sg.b[0] - sg.a[0]), -(sg.b[1] - sg.a[1]));
+    });
+  }
+  v.renderer.render(v.scene, v.camera);
+}
+function run3d() {
+  const v = view3d; if (!v || v.raf) return;
+  const loop = now => {
+    v.raf = 0;
+    if (mapMode === "2d" || $("navPanel").hidden || document.hidden) return;   // sleep when not shown
+    if (now - v.lastFrame >= 33) { v.lastFrame = now; tick3d(); }              // about 30 frames a second
+    v.raf = requestAnimationFrame(loop);
+  };
+  v.raf = requestAnimationFrame(loop);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) run3d(); });
+function applyMapMode() {
+  const is3 = mapMode !== "2d" && view3d;
+  $("map3d").hidden = !is3; $("map").style.visibility = is3 ? "hidden" : "";
+  $("modeBtn").textContent = mapMode === "3d" ? "👁️ גובה העיניים" : mapMode === "eye" ? "🗺️ מפה שטוחה" : "🧊 תלת-ממד";
+  $("modeBtn").setAttribute("aria-label", "החלף תצוגת מפה, עכשיו: " + (mapMode === "3d" ? "תלת-ממד" : mapMode === "eye" ? "גובה העיניים" : "מפה שטוחה"));
+  if (is3) { size3d(); aimCamera(); } else fitMap();
+}
+async function start3d() {
+  if (view3d || three3dFailed) { applyMapMode(); return; }
+  try {
+    const c = document.createElement("canvas");
+    if (!(c.getContext("webgl") || c.getContext("experimental-webgl"))) throw new Error("no webgl");
+    const T = await loadThree();
+    try { await document.fonts.ready; } catch (e) {}
+    build3d(T); update3d();
+  } catch (e) { three3dFailed = true; mapMode = "2d"; $("modeBtn").hidden = true; }
+  applyMapMode();
+}
+$("modeBtn").addEventListener("click", () => {
+  mapMode = mapMode === "3d" ? "eye" : mapMode === "eye" ? "2d" : "3d";
+  if (view3d) view3d.overview = false;
+  try { localStorage.setItem("mapMode", mapMode); } catch (e) {}
+  applyMapMode(); run3d();
+});
+try { const m = localStorage.getItem("mapMode"); if (m === "3d" || m === "eye" || m === "2d") mapMode = m; } catch (e) {}
 
 // ---------- Boot ----------
 // a new visit always starts with an empty list (nothing is kept from an earlier trip)
