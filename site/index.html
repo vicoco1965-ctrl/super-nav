@@ -127,6 +127,8 @@ body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding
 .steps li small{display:block;color:var(--muted);font-weight:400}
 .steps li.cur small{color:var(--tag-fg)}
 #addText{font:inherit;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--floor);color:var(--fg);padding:0 12px;min-width:0}
+.appnote{margin:6px 0;padding:10px 12px;border-radius:12px;background:var(--tag);color:var(--tag-fg);font-size:15px;line-height:1.45}
+.appnote button{margin-top:8px;min-height:40px;font-size:15px}
 .map .wall{fill:none;stroke:var(--muted);stroke-width:2}
 .hands{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .live{font-size:14px;color:var(--muted)}
@@ -158,6 +160,7 @@ body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding
       <textarea id="listText" aria-label="רשימת קניות, פריט בכל שורה או מופרד בפסיקים" placeholder="חלב, לחם, עגבניות..."></textarea>
       <div class="row" style="margin-top:8px"><button class="primary grow" id="parseBtn" type="button">עדכן רשימה</button></div>
     </div>
+    <p class="appnote" id="appNote" hidden></p>
     <p class="status" id="status" role="status"></p>
     <ul class="items" id="items"></ul>
     <p class="note" id="emptyNote">הרשימה ריקה. צלם, אמור או הקלד את רשימת הקניות. <button type="button" id="sampleBtn" style="min-height:0;padding:2px 8px;font-size:14px">נסה רשימה לדוגמה</button></p>
@@ -190,6 +193,7 @@ body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding
         <button id="nextBtn" class="primary" type="button" aria-label="התחנה הבאה">הבא ▸</button>
         <button id="finishBtn" class="primary" type="button" hidden>🏁 סיום</button>
       </div>
+      <p class="appnote" id="appNote2" hidden></p>
       <p class="live" id="live">לחץ "דבר איתי" ושאל: "איפה החלב?", "תוסיף ביצים", "מה הלאה?"</p>
       <details class="drawer" id="drawer">
         <summary>☰ כל התחנות ועוד אפשרויות</summary>
@@ -535,6 +539,7 @@ function setMuted(on) {
 }
 async function speak(text) {
   if (muted) return;
+  if (tts && window.claude) { try { await tts.speak(text, { language: "he" }); return; } catch (e) {} }
   if (heVoice) {
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.voice = heVoice; u.lang = heVoice.lang; u.rate = 0.95; speechSynthesis.speak(u); return; } catch (e) {}
   }
@@ -1142,6 +1147,7 @@ function listenOnce() {
 
 $("talkBtn").addEventListener("click", async () => {
   if (talking) { talking.stop(); return; }
+  if (!dict && !SRClass && !server.stt) { bubble("", window.claude ? "כאן אין מיקרופון. פתח את הקישור בדפדפן Chrome כדי לדבר עם הניווט." : "בדפדפן הזה אין זיהוי דיבור. נסה את Chrome."); return; }
   if ($("talkBtn").classList.contains("busy")) return;
   stopSpeaking();
   const text = await listenOnce();
@@ -1283,6 +1289,20 @@ async function converse(text) {
   try { await runPlan(plan, text); } finally { talkState("idle"); }
 }
 
+// Inside the Claude phone app the page can't use the microphone or speak: say so plainly and point to a browser
+const ARTIFACT_URL = "https://claude.ai/artifact/6i7DWTqBL1L76d22S1fFYB";
+function noVoiceHere(noMic, noSpeaker) {
+  const what = noMic && noSpeaker ? "אין כאן מיקרופון וקול" : noMic ? "אין כאן מיקרופון" : "אין כאן קול";
+  const msg = `${what} (אפליקציית Claude בטלפון חוסמת אותם). כדי לדבר עם הניווט ולשמוע הוראות, פתח את הקישור בדפדפן Chrome. בינתיים הכל עובד בלחיצות, וההוראות כתובות על המסך.`;
+  for (const id of ["appNote", "appNote2"]) {
+    const n = $(id); n.hidden = false; n.textContent = msg;
+    const b = document.createElement("button"); b.type = "button"; b.textContent = "📋 העתק קישור לפתיחה בכרום";
+    b.onclick = () => { const ok = () => { b.textContent = "הקישור הועתק ✓ הדבק אותו בכרום"; }; try { navigator.clipboard.writeText(ARTIFACT_URL).then(ok, () => { b.textContent = ARTIFACT_URL; }); } catch (e) { b.textContent = ARTIFACT_URL; } };
+    n.appendChild(document.createElement("br")); n.appendChild(b);
+  }
+  if (noMic) { $("talkLbl").textContent = "אין מיקרופון"; $("talkBtn").setAttribute("aria-disabled", "true"); }
+}
+
 // ---------- Boot ----------
 // a new visit always starts with an empty list (nothing is kept from an earlier trip)
 isExample = false;
@@ -1292,7 +1312,9 @@ $("finishBtn").addEventListener("click", resetAll);
 if (window.claude && window.claude.use) {
   window.claude.use("sample").then(s => { sample = s; if (s) s.limits().then(l => { if (!l || !l.images) sample = null; }).catch(() => {}); });
   window.claude.use("tts").then(t => { tts = t; voiceNote(); });
-  window.claude.use("dictation").then(d => wireDictation(d || browserDictation()));
+  const dictP = window.claude.use("dictation").then(d => { wireDictation(d); return d; });
+  const ttsP = window.claude.use("tts");
+  Promise.all([dictP, ttsP]).then(([d, t]) => { if (!d || !t) noVoiceHere(!d, !t); });
 } else {
   wireDictation(browserDictation());
 }
