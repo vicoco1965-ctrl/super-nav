@@ -523,7 +523,12 @@ function drawMap() {
 // ---------- Voice out ----------
 let heVoice = null, tts = null;
 function pickVoice() {
-  try { const vs = speechSynthesis.getVoices(); heVoice = vs.find(v => /^he|^iw/i.test(v.lang)) || null; } catch (e) { heVoice = null; }
+  // one Hebrew voice for the whole trip: Google's Hebrew voice first (clearest on Android), never an English one
+  try {
+    const he = speechSynthesis.getVoices().filter(v => /^(he|iw)([-_]|$)/i.test(v.lang));
+    const best = he.find(v => /google/i.test(v.name)) || he.find(v => !v.localService) || he[0] || null;
+    if (best && !heVoice) heVoice = best;   // once chosen, keep it (no switching voices mid-route)
+  } catch (e) {}
   voiceNote();
 }
 try { speechSynthesis.onvoiceschanged = pickVoice; pickVoice(); } catch (e) {}
@@ -539,9 +544,15 @@ function setMuted(on) {
 }
 async function speak(text) {
   if (muted) return;
-  if (tts && window.claude) { try { await tts.speak(text, { language: "he" }); return; } catch (e) {} }
+  if (!heVoice) {   // Chrome loads its voices a moment after the page; wait for them rather than use a foreign voice
+    pickVoice();
+    try { if (!heVoice && !speechSynthesis.getVoices().length) { await new Promise(r => setTimeout(r, 900)); pickVoice(); } } catch (e) {}
+  }
+  // the phone's Hebrew voice is the only voice used when it exists; the Claude voice reads Hebrew
+  // with an English accent, so it is used only on devices that have no Hebrew voice at all
   if (heVoice) {
-    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.voice = heVoice; u.lang = heVoice.lang; u.rate = 0.95; speechSynthesis.speak(u); return; } catch (e) {}
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.voice = heVoice; u.lang = "he-IL"; u.rate = 0.95; u.pitch = 1; speechSynthesis.speak(u); } catch (e) {}
+    return;
   }
   if (tts) {
     const wasListening = listening;
@@ -1314,7 +1325,7 @@ if (window.claude && window.claude.use) {
   window.claude.use("tts").then(t => { tts = t; voiceNote(); });
   const dictP = window.claude.use("dictation").then(d => { wireDictation(d); return d; });
   const ttsP = window.claude.use("tts");
-  Promise.all([dictP, ttsP]).then(([d, t]) => { if (!d || !t) noVoiceHere(!d, !t); });
+  Promise.all([dictP, ttsP]).then(([d, t]) => { if (!d || (!t && !heVoice)) noVoiceHere(!d, !t && !heVoice); });
 } else {
   wireDictation(browserDictation());
 }
