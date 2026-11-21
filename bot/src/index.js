@@ -13,7 +13,15 @@ const AI_PER_DAY = 40; // photo / voice / AI lookups per customer per day, prote
 
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+    let url = new URL(request.url);
+    // store pages: /s/<slug> is the site's index.html; the page's relative paths (vendor/, handoff.js,
+    // api/...) then resolve under /s/, so serve those from the root
+    const sm = url.pathname.match(/^\/s\/(.*)$/);
+    if (sm) {
+      if (/^[a-z0-9-]+\/?$/i.test(sm[1])) return env.ASSETS.fetch(new Request(new URL("/", url), request));
+      url = new URL("/" + sm[1] + url.search, url);
+      request = new Request(url, request);
+    }
     if (url.pathname === "/webhook" && request.method === "GET") {
       const ok = url.searchParams.get("hub.mode") === "subscribe" && url.searchParams.get("hub.verify_token") === (env.VERIFY_TOKEN || "super-nav");
       return ok ? new Response(url.searchParams.get("hub.challenge") || "") : new Response("forbidden", { status: 403 });
@@ -41,6 +49,8 @@ export default {
 };
 
 // One object per customer phone number: keeps their list and handles their messages one at a time.
+export { StoreDB } from "./stores.js";
+
 export class Customer extends DurableObject {
   async onMessage(msg, phoneId, origin) {
     const store = this.ctx.storage;

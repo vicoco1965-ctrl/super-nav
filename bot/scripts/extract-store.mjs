@@ -16,7 +16,7 @@ export function buildCore(html) {
     cut("const SPINE", "// ---------- State"),
     cut("// corridors the customer walks", "const pts ="),
     cut("// true when a known product word", "// Speech -> list"),
-    cut("const HEB_NUM", "(function buildPicker"),
+    cut("const HEB_NUM", "function rebuildPicker"),
   ];
   return `// GENERATED from site/index.html by bot/scripts/extract-store.mjs. Do not edit by hand.\n` +
     parts.join("\n\n") +

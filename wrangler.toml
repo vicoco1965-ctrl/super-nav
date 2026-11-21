@@ -18,9 +18,17 @@ binding = "AI"
 name = "CUSTOMERS"
 class_name = "Customer"
 
+[[durable_objects.bindings]]
+name = "STORES"
+class_name = "StoreDB"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Customer"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["StoreDB"]
 
 [observability]
 enabled = true
@@ -28,4 +36,5 @@ enabled = true
 # Secrets (set in the Cloudflare dashboard, never in this file):
 #   WHATSAPP_TOKEN  access token from Meta
 #   APP_SECRET      Meta app secret, used to check that messages really come from WhatsApp
+#   ADMIN_TOKEN     code for saving store maps from the site's mapping tool
 #   VERIFY_TOKEN    optional, the word typed in Meta's webhook screen (default: super-nav)
