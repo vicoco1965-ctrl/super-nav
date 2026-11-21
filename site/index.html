@@ -86,6 +86,47 @@ textarea{font:inherit;width:100%;min-height:96px;border-radius:10px;border:1px s
 .pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px}
 .pick button{min-height:48px;padding:6px;font-size:17px}
 .pick .wide{grid-column:span 2;font-size:15px}
+/* ---- Navigation screen: one big instruction on top, the map fills the rest, extras in a drawer ---- */
+.nav{display:flex;flex-direction:column;gap:0}
+body.navmode{overflow:hidden}
+body.navmode #listPanel, body.navmode header{display:none}
+body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.navtop{padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px;background:var(--bg);border-bottom:1px solid var(--line)}
+.navbar1{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.icon{min-height:40px;min-width:44px;padding:4px 10px;font-size:18px}
+.icon[aria-pressed="true"]{background:var(--now);color:var(--now-fg);border-color:var(--now)}
+.nav .tag{padding:10px 12px;gap:2px 12px}
+.nav .tag .num{font-size:40px;min-width:50px}
+.nav .tag .where{font-size:21px}
+.nav .tag .take{font-size:19px;padding-top:6px;margin-top:2px}
+.mapwrap{position:relative;flex:1 1 auto;min-height:0;background:var(--floor)}
+.mapwrap .map{width:100%;height:100%;border:0;border-radius:0;max-width:100%}
+.floatbtn{position:absolute;top:10px;inset-inline-start:10px;min-height:38px;padding:4px 12px;font-size:14px;background:var(--surface);box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.bubble{position:absolute;inset-inline:12px;bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:0 2px 10px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:4px;font-size:16px}
+#bubbleYou{color:var(--muted);font-size:14px}
+#bubbleMe{font-weight:700}
+.navbottom{padding:8px 12px 10px;border-top:1px solid var(--line);background:var(--bg);display:flex;flex-direction:column;gap:6px;max-height:60%;overflow:auto}
+.ctrl{display:grid;grid-template-columns:64px 1fr 1fr;gap:8px}
+.ctrl button{min-height:60px;font-size:19px}
+.ctrl #finishBtn{grid-column:3}
+.talk{flex-direction:column;gap:0;font-size:17px;background:var(--surface);border:2px solid var(--accent)}
+.talk .mic{font-size:24px;line-height:1}
+.talk.on{background:var(--now);color:var(--now-fg);border-color:var(--now)}
+.talk.busy{opacity:.75}
+@media (prefers-reduced-motion:no-preference){.talk.on{animation:pulse 1.1s ease-in-out infinite}@keyframes pulse{50%{transform:scale(1.04)}}}
+.nav .live{margin:0;text-align:center;font-size:14px}
+.drawer{border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.drawer summary{cursor:pointer;padding:12px;font-weight:700;list-style:none;min-height:44px}
+.drawer summary::-webkit-details-marker{display:none}
+.drawer[open]{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
+.drawer[open] summary{padding-inline:0}
+.steps{margin:0;padding:0 22px 0 0;display:flex;flex-direction:column;gap:2px}
+.steps li{padding:6px 4px;border-radius:8px;cursor:pointer}
+.steps li.done{color:var(--muted);text-decoration:line-through}
+.steps li.cur{background:var(--tag);color:var(--tag-fg);font-weight:700}
+.steps li small{display:block;color:var(--muted);font-weight:400}
+.steps li.cur small{color:var(--tag-fg)}
+#addText{font:inherit;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--floor);color:var(--fg);padding:0 12px;min-width:0}
 .map .wall{fill:none;stroke:var(--muted);stroke-width:2}
 .hands{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .live{font-size:14px;color:var(--muted)}
@@ -123,48 +164,62 @@ textarea{font:inherit;width:100%;min-height:96px;border-radius:10px;border:1px s
     <button class="primary bignext" id="startBtn" type="button">התחל ניווט ▸</button>
   </section>
 
-  <section class="panel" id="navPanel" aria-labelledby="navH">
-    <div class="row" style="justify-content:space-between;align-items:center">
-      <h2 id="navH">המסלול</h2>
-      <span class="progress" id="progress"></span>
+  <section id="navPanel" class="nav" aria-label="ניווט" hidden>
+    <div class="navtop">
+      <div class="navbar1">
+        <button id="exitNav" class="icon" type="button" aria-label="חזרה לרשימה">✕</button>
+        <span class="progress" id="progress"></span>
+        <button id="muteBtn" class="icon" type="button" aria-pressed="false" aria-label="השתק">🔊</button>
+      </div>
+      <div class="tag" id="tag" aria-live="polite">
+        <div class="num" id="tagNum">1</div>
+        <div class="where" id="tagWhere"></div>
+        <div class="turn" id="tagTurn"></div>
+        <div class="take" id="tagTake"></div>
+      </div>
     </div>
-    <div class="tag" id="tag" aria-live="polite">
-      <div class="num" id="tagNum">1</div>
-      <div class="where" id="tagWhere"></div>
-      <div class="turn" id="tagTurn"></div>
-      <div class="take" id="tagTake"></div>
+    <div class="mapwrap">
+      <svg class="map" id="map" viewBox="0 0 360 700" preserveAspectRatio="xMidYMid meet" role="img" aria-label="מפת סניף יוחננוף באר שבע עם המסלול"></svg>
+      <button id="zoomBtn" class="floatbtn" type="button">🗺️ כל החנות</button>
+      <div class="bubble" id="bubble" hidden><div id="bubbleYou"></div><div id="bubbleMe"></div></div>
     </div>
-    <div class="row">
-      <button class="grow" id="prevBtn" type="button">◂ הקודם</button>
-      <button class="grow" id="repeatBtn" type="button">🔊 שוב</button>
-      <button class="primary grow bignext" id="nextBtn" type="button">הבא ▸</button>
-      <button class="primary grow bignext" id="finishBtn" type="button" hidden>🏁 סיימתי, קנייה חדשה</button>
+    <div class="navbottom">
+      <div class="ctrl">
+        <button id="prevBtn" type="button" aria-label="התחנה הקודמת">◂</button>
+        <button id="talkBtn" class="talk" type="button" aria-label="דבר עם האפליקציה"><span class="mic">🎤</span><span id="talkLbl">דבר איתי</span></button>
+        <button id="nextBtn" class="primary" type="button" aria-label="התחנה הבאה">הבא ▸</button>
+        <button id="finishBtn" class="primary" type="button" hidden>🏁 סיום</button>
+      </div>
+      <p class="live" id="live">לחץ "דבר איתי" ושאל: "איפה החלב?", "תוסיף ביצים", "מה הלאה?"</p>
+      <details class="drawer" id="drawer">
+        <summary>☰ כל התחנות ועוד אפשרויות</summary>
+        <ol class="steps" id="steps"></ol>
+        <div class="row">
+          <button class="grow" id="repeatBtn" type="button">🔊 שוב</button>
+          <button class="grow" id="addBtn" type="button">➕ הוסף פריט</button>
+        </div>
+        <div class="row" id="addBox" hidden>
+          <input id="addText" class="grow" type="text" aria-label="מה להוסיף לרשימה" placeholder="למשל: טחינה">
+          <button class="primary" id="addGo" type="button">הוסף</button>
+        </div>
+        <div class="row">
+          <button class="grow" id="pickBtn" type="button" aria-expanded="false">🔢 אני במעבר...</button>
+          <button class="grow" id="whereBtn" type="button" data-input="signPhoto">📷 צלם שלט (ניסיוני)</button>
+        </div>
+        <div id="pickBox" class="pick" hidden></div>
+        <input type="file" id="signPhoto" class="vh" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
+        <p class="status" id="whereStatus" role="status"></p>
+        <div class="row">
+          <button class="grow" id="handsBtn" type="button">🎙️ ידיים חופשיות</button>
+        </div>
+        <div class="row">
+          <a class="btn wa grow" id="waBtn" href="#" target="_blank" rel="noopener">שלח מסלול בוואטסאפ</a>
+          <button class="grow" id="copyBtn" type="button">העתק מסלול</button>
+        </div>
+        <p class="note" id="voiceNote"></p>
+        <p class="note" id="brainNote"></p>
+      </details>
     </div>
-    <div class="row">
-      <button class="grow" id="whereBtn" type="button" data-input="signPhoto">📷 צלם שלט (ניסיוני)</button>
-      <button class="grow" id="pickBtn" type="button" aria-expanded="false">🔢 אני במעבר...</button>
-    </div>
-    <div id="pickBox" class="pick" hidden></div>
-    <input type="file" id="signPhoto" class="vh" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
-    <p class="status" id="whereStatus" role="status"></p>
-    <div class="row">
-      <button class="grow" id="muteBtn" type="button" aria-pressed="false">🔇 השתק</button>
-      <button class="grow" id="addBtn" type="button">➕ הוסף פריט</button>
-    </div>
-    <div class="row" id="addBox" hidden>
-      <input id="addText" class="grow" type="text" aria-label="מה להוסיף לרשימה" placeholder="למשל: טחינה" style="font:inherit;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--floor);color:var(--fg);padding:0 12px;min-width:0">
-      <button class="primary" id="addGo" type="button">הוסף</button>
-    </div>
-    <div class="hands">
-      <button id="handsBtn" type="button">🎙️ ידיים חופשיות</button>
-      <span class="live" id="live">אמור "הבא", "שוב", "איפה הטחינה?" או "אני במעבר 8"</span>
-    </div>
-    <svg class="map" id="map" viewBox="0 0 360 700" role="img" aria-label="מפת סניף יוחננוף באר שבע עם המסלול"></svg>
-    <div class="row">
-      <a class="btn wa grow" id="waBtn" href="#" target="_blank" rel="noopener">שלח מסלול בוואטסאפ</a>
-      <button class="grow" id="copyBtn" type="button">העתק מסלול</button>
-    </div>
-    <p class="note" id="voiceNote"></p>
   </section>
 </div>
 
@@ -334,7 +389,7 @@ function stopText(i) {
   if (s.end) return { turn, where: s.section.where, take: "סיימת את הרשימה", say: `${turn}, אל ${s.section.where}. סיימת את כל הרשימה, בהצלחה!` };
   const list = s.items.join(", ");
   const total = stops.length - 1;
-  if (here && i === cur && here.id === s.section.id) return { turn, where: s.section.where, take: "קח: " + list, say: `אתה ב${s.section.where}. קח ${list}.` };
+  if (here && i === cur && here.id === s.section.id) return { turn, where: s.section.where, take: "קח: " + list, say: `אתה ${inPlace(s.section.where)}. קח ${list}.` };
   const lead = here && i === cur ? `אתה ליד ${here.where}. ` : "";
   return { turn, where: s.section.where, take: "קח: " + list, say: `${lead}תחנה ${i + 1} מתוך ${total}. ${turn}, אל ${s.section.where}. קח ${list}.` };
 }
@@ -356,11 +411,12 @@ function renderNav() {
   $("nextBtn").disabled = cur >= stops.length - 1;
   const atEnd = !!(stops[cur] && stops[cur].end) && stops.length > 1;
   $("nextBtn").hidden = atEnd; $("finishBtn").hidden = !atEnd;
-  drawMap();
+  drawMap(); renderSteps(); fitMap();
 }
 
 // ---------- Map ----------
 const NS = "http://www.w3.org/2000/svg";
+let lastLeg = null; // the walk to the current stop, for the map zoom
 function el(tag, attrs, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
 // corridors the customer walks: right walkway, main walkway, back corridor, connector between them
 const CORR = [[[RIGHT, BACK], [RIGHT, 700]], [[SPINE, BACK], [SPINE, 640]], [[LEFT, BACK], [LEFT, 640]], [[LEFT, BACK], [330, BACK]], [[SPINE, CONNECT], [RIGHT, CONNECT]], [[LEFT, 640], [SPINE, 640]],
@@ -445,6 +501,7 @@ function drawMap() {
   }
   m.appendChild(el("polyline", { points: pts(all), class: "route" }));
   if (here && stops[cur]) curLeg = leg(here.stop, stops[cur].section.stop);
+  lastLeg = curLeg || (stops[cur] ? [stops[cur].section.stop] : null);
   if (curLeg) m.appendChild(el("polyline", { points: pts(curLeg), class: "leg" }));
   stops.forEach((s, i) => {
     const [x, y] = s.section.stop;
@@ -473,8 +530,8 @@ let muted = false;
 function stopSpeaking() { try { speechSynthesis.cancel(); } catch (e) {} try { tts && tts.stop(); } catch (e) {} }
 function setMuted(on) {
   muted = on; if (on) stopSpeaking();
-  $("muteBtn").textContent = on ? "🔊 החזר קול" : "🔇 השתק";
-  $("muteBtn").setAttribute("aria-pressed", String(on)); $("muteBtn").classList.toggle("primary", on);
+  $("muteBtn").textContent = on ? "🔇" : "🔊";
+  $("muteBtn").setAttribute("aria-pressed", String(on)); $("muteBtn").setAttribute("aria-label", on ? "החזר קול" : "השתק");
 }
 async function speak(text) {
   if (muted) return;
@@ -578,8 +635,8 @@ async function askFor(phrase) {
   else stop = { section: sec, items: [found.name] };
   stops.splice(cur, 0, stop);
   here = null; renderNav(); updateShare();
-  $("whereStatus").textContent = `נוסף: ${found.name}, ב${sec.where}. זו התחנה הבאה שלך.`;
-  speak(`${found.name} נמצא ב${sec.where}. ${stopText(cur).turn}.`);
+  $("whereStatus").textContent = `נוסף: ${found.name}, ${inPlace(sec.where)}. זו התחנה הבאה שלך.`;
+  speak(`יש ${found.name} ${inPlace(sec.where)}. ${stopText(cur).turn}.`);
 }
 // Mute and "add item" while navigating
 $("muteBtn").addEventListener("click", () => setMuted(!muted));
@@ -672,8 +729,7 @@ $("nextBtn").addEventListener("click", () => go(1));
 $("prevBtn").addEventListener("click", () => go(-1));
 $("repeatBtn").addEventListener("click", say);
 $("startBtn").addEventListener("click", () => {
-  cur = 0; renderNav(); $("navPanel").scrollIntoView({ behavior: "smooth", block: "start" }); say();
-  try { navigator.wakeLock && navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
+  cur = 0; enterNav(); renderNav(); say();
 });
 
 // ---------- WhatsApp / copy ----------
@@ -751,9 +807,10 @@ function resetAll() {
   isExample = false; items = [];
   for (const id of ["listText", "addText"]) $(id).value = "";
   for (const id of ["pasteBox", "addBox", "pickBox"]) $(id).hidden = true;
-  status(""); $("whereStatus").textContent = ""; $("live").textContent = "אמור \"הבא\", \"שוב\", \"איפה הטחינה?\" או \"אני במעבר 8\"";
+  status(""); $("whereStatus").textContent = ""; $("live").textContent = "לחץ \"דבר איתי\" ושאל: \"איפה החלב?\", \"תוסיף ביצים\", \"מה הלאה?\"";
   // drop a list that came in the link (from WhatsApp), so reopening the page starts clean
   try { if (location.hash) history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+  exitNav(); history_.length = 0; $("bubble").hidden = true;
   setItems([]);
   window.scrollTo({ top: 0, behavior: "smooth" });
   status("הקנייה הסתיימה. אפשר להתחיל רשימה חדשה.");
@@ -771,7 +828,7 @@ function whereFromWords(w) {
   const box = $("pickBox");
   for (let i = 1; i <= 14; i++) { const b = document.createElement("button"); b.type = "button"; b.textContent = i; b.setAttribute("aria-label", "אני במעבר " + i); b.onclick = () => pick(BYID["a" + i]); box.appendChild(b); }
   for (const id of ["produce", "greens", "nuts", "dairy", "bakery", "meat", "frozen", "drinks", "beer"]) { const s = BYID[id]; const b = document.createElement("button"); b.type = "button"; b.className = "wide"; b.textContent = s.short; b.onclick = () => pick(s); box.appendChild(b); }
-  function pick(sec) { box.hidden = true; $("pickBtn").setAttribute("aria-expanded", "false"); $("whereStatus").textContent = "אתה ב" + sec.where + ". המסלול חושב מחדש מכאן."; relocate(sec); }
+  function pick(sec) { box.hidden = true; $("pickBtn").setAttribute("aria-expanded", "false"); $("whereStatus").textContent = "אתה " + inPlace(sec.where) + ". המסלול חושב מחדש מכאן."; relocate(sec); }
   $("pickBtn").addEventListener("click", () => { box.hidden = !box.hidden; $("pickBtn").setAttribute("aria-expanded", String(!box.hidden)); });
 })();
 let here = null; // section the customer was last seen at
@@ -901,12 +958,329 @@ function wireDictation(d) {
   dict = d;
   if (!d) { $("handsBtn").hidden = true; $("sayListBtn").hidden = true; $("live").textContent = "בדפדפן הזה אין פקודות קוליות. הכפתורים הגדולים עובדים בכל מקום."; return; }
   d.onFinal(({ text }) => {
+    if (talkMode) { talkHeard = text; talkDone && talkDone(text); return; }
     if (listMode) { heard.push(text); status("שמעתי: " + heard.join(" ")); return; }
     if (askMode && !addRec) { if (!listening) d.stop().catch(() => {}); finishAdd(text); return; }
     command(text);
   });
-  d.onPartial(({ text }) => { if (listMode) status("שמעתי: " + heard.concat([text]).join(" ")); else if (askMode && !addRec) { addHeard = text; $("addText").value = text; } });
-  d.onState(({ state }) => { if (state === "idle") { if (listening) setListening(false); if (listMode) finishListMode(); if (askMode && !addRec) finishAdd(addHeard); } });
+  d.onPartial(({ text }) => { if (talkMode) { talkHeard = text; $("live").textContent = "שומע: " + text; return; } if (listMode) status("שמעתי: " + heard.concat([text]).join(" ")); else if (askMode && !addRec) { addHeard = text; $("addText").value = text; } });
+  d.onState(({ state }) => { if (state === "idle") { if (talkMode && !listening) { talkDone && talkDone(talkHeard); } if (listening) setListening(false); if (listMode) finishListMode(); if (askMode && !addRec) finishAdd(addHeard); } });
+}
+
+// ---------- Navigation screen: enter / exit, step list, map zoom ----------
+function enterNav() {
+  $("navPanel").hidden = false; document.body.classList.add("navmode");
+  $("drawer").open = false; mapZoomAll = false; window.scrollTo(0, 0);
+  try { navigator.wakeLock && navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
+}
+function exitNav() {
+  document.body.classList.remove("navmode"); $("navPanel").hidden = true;
+  if (talking) talking.cancel();
+  stopSpeaking();
+}
+$("exitNav").addEventListener("click", exitNav);
+function renderSteps() {
+  const ol = $("steps"); ol.textContent = "";
+  stops.forEach((s, i) => {
+    const li = document.createElement("li");
+    li.className = i < cur ? "done" : i === cur ? "cur" : "";
+    li.textContent = s.end ? "קופות" : s.section.where;
+    if (!s.end) { const sm = document.createElement("small"); sm.textContent = s.items.join(", "); li.appendChild(sm); }
+    li.onclick = () => { cur = i; here = null; renderNav(); say(); };
+    ol.appendChild(li);
+  });
+}
+// The map zooms in on the walk to the current stop; "all store" shows everything
+const FULL = [0, 0, 360, 700];
+let mapZoomAll = false, viewNow = FULL.slice(), viewAnim = 0;
+function legBox(L) {
+  if (!L || !L.length) return FULL;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const [x, y] of L) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  const pad = 46; x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+  // keep at least a readable area, and keep the box roughly the shape of the screen's map area
+  const box = $("map").getBoundingClientRect(), ratio = box.width > 0 && box.height > 0 ? box.height / box.width : 1.4;
+  let w = Math.max(x1 - x0, 200), h = Math.max(y1 - y0, 220);
+  if (h / w < ratio) h = w * ratio; else w = h / ratio;
+  w = Math.min(w, 360); h = Math.min(h, 700);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const x = Math.min(Math.max(cx - w / 2, 0), 360 - w), y = Math.min(Math.max(cy - h / 2, 0), 700 - h);
+  return [x, y, w, h];
+}
+function fitMap() {
+  const target = mapZoomAll ? FULL : legBox(lastLeg);
+  $("zoomBtn").textContent = mapZoomAll ? "🔍 הקטע הנוכחי" : "🗺️ כל החנות";
+  const from = viewNow.slice(), t0 = performance.now(), dur = matchMedia("(prefers-reduced-motion: reduce)").matches || $("navPanel").hidden ? 0 : 450;
+  cancelAnimationFrame(viewAnim);
+  const step = now => {
+    const k = dur ? Math.min(1, (now - t0) / dur) : 1, e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    viewNow = from.map((v, i) => v + (target[i] - v) * e);
+    $("map").setAttribute("viewBox", viewNow.map(v => v.toFixed(1)).join(" "));
+    if (k < 1) viewAnim = requestAnimationFrame(step);
+  };
+  step(t0);
+}
+$("drawer").addEventListener("toggle", () => { if ($("drawer").open) $("bubble").hidden = true; else fitMap(); });
+$("zoomBtn").addEventListener("click", () => { mapZoomAll = !mapZoomAll; fitMap(); });
+addEventListener("resize", () => { if (!$("navPanel").hidden) fitMap(); });
+
+// ---------- Talk with the app: speak, it understands, moves the map and answers out loud ----------
+// Hearing: strong server recognition when the site has it (api/stt), else the phone's own recognizer,
+// else Claude dictation inside the Claude viewer. Understanding: Claude (inside the viewer, or the
+// site's api/claude), else simple rules on the phone. Everything still works with the buttons.
+let server = { assist: false, stt: false };
+function brainNote() {
+  const smart = !!(sample || server.assist);
+  $("brainNote").textContent = (smart ? "שיחה: Claude מבין ועונה." : "שיחה: הבנה בסיסית בטלפון (משפטים קצרים כמו \"איפה החלב\", \"תוסיף ביצים\", \"הבא\").")
+    + (server.stt ? " זיהוי דיבור משופר פעיל." : "");
+}
+if (!window.claude) {
+  fetch("api/health", { cache: "no-store" }).then(r => r.ok ? r.json() : null)
+    .then(j => { if (j && typeof j === "object") server = { assist: !!j.assist, stt: !!j.stt }; }).catch(() => {}).finally(brainNote);
+} else setTimeout(brainNote, 1500);
+
+let talking = null, talkMode = false, talkHeard = "", talkDone = null;
+const history_ = []; // last few turns, so "and cheese too" makes sense
+function talkState(st) {
+  const b = $("talkBtn");
+  b.classList.toggle("on", st === "listen"); b.classList.toggle("busy", st === "think");
+  $("talkLbl").textContent = st === "listen" ? "מקשיב... לחץ לסיום" : st === "think" ? "רגע..." : "דבר איתי";
+}
+function bubble(you, me) {
+  $("bubble").hidden = false;
+  $("bubbleYou").textContent = you ? "אמרת: " + you : "";
+  $("bubbleMe").textContent = me || "";
+  clearTimeout(bubble.t); bubble.t = setTimeout(() => { $("bubble").hidden = true; }, 15000);
+}
+$("bubble").addEventListener("click", () => { $("bubble").hidden = true; });
+
+// Listen for one sentence. Resolves with the text ("" if nothing was heard).
+function listenOnce() {
+  return new Promise(resolve => {
+    let finished = false;
+    const hands = !!(listening && dict);
+    let paused = false;
+    // the phone allows one recognizer at a time: pause hands-free while this one listens
+    const pause = () => { if (hands) { paused = true; try { dict.stop(); } catch (e) {} } };
+    const finish = t => {
+      if (finished) return; finished = true; talking = null; talkMode = false;
+      if (paused) dict.start().then(() => setListening(true)).catch(() => setListening(false));
+      resolve((t || "").trim());
+    };
+    $("live").textContent = "מקשיב... דבר עכשיו";
+    // 1) strong recognition on the server: record a short clip, stop on silence
+    if (server.stt && navigator.mediaDevices && window.MediaRecorder) {
+      pause();
+      let mr = null, stream = null, ac = null, poll = 0, cap = 0, cancelled = false;
+      talking = { stop() { if (mr && mr.state === "recording") mr.stop(); else if (!mr) { cancelled = true; finish(""); } }, cancel() { cancelled = true; if (mr && mr.state === "recording") mr.stop(); finish(""); } };
+      navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(st => {
+        stream = st;
+        if (cancelled) { st.getTracks().forEach(t => t.stop()); return; }
+        const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
+        mr = new MediaRecorder(st, type ? { mimeType: type } : undefined);
+        const chunks = [];
+        mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+        mr.onstop = async () => {
+          clearInterval(poll); clearTimeout(cap); try { ac && ac.close(); } catch (e) {}
+          stream.getTracks().forEach(t => t.stop());
+          if (cancelled) return;
+          const blob = new Blob(chunks, { type: mr.mimeType || type || "audio/webm" });
+          if (blob.size < 1200) { finish(""); return; }
+          talkState("think"); $("live").textContent = "מזהה את מה שאמרת...";
+          try {
+            const r = await fetch("api/stt", { method: "POST", headers: { "Content-Type": blob.type || "audio/webm" }, body: blob });
+            const j = r.ok ? await r.json() : null;
+            finish(j && typeof j.text === "string" ? j.text : "");
+          } catch (e) { finish(""); }
+        };
+        mr.start(250); talkState("listen");
+        // stop by itself after a pause in speech (or after 10 seconds)
+        try {
+          ac = new (window.AudioContext || window.webkitAudioContext)();
+          const an = ac.createAnalyser(); an.fftSize = 1024; ac.createMediaStreamSource(st).connect(an);
+          const buf = new Uint8Array(an.fftSize); let spoke = false, quietSince = performance.now(), t0 = performance.now();
+          poll = setInterval(() => {
+            an.getByteTimeDomainData(buf); let sum = 0; for (const v of buf) sum += (v - 128) * (v - 128);
+            const rms = Math.sqrt(sum / buf.length) / 128, now = performance.now();
+            if (rms > 0.045) { spoke = true; quietSince = now; }
+            if ((spoke && now - quietSince > 1300) || (!spoke && now - t0 > 6000)) { if (mr.state === "recording") mr.stop(); }
+          }, 100);
+        } catch (e) {}
+        cap = setTimeout(() => { if (mr.state === "recording") mr.stop(); }, 10000);
+      }).catch(() => { $("live").textContent = SR_ERR["not-allowed"]; finish(""); });
+      return;
+    }
+    // 2) the phone's own recognizer, one sentence at a time
+    if (SRClass) {
+      pause();
+      let rec, said = "";
+      try { rec = new SRClass(); } catch (e) { finish(""); return; }
+      rec.lang = "he-IL"; rec.continuous = false; rec.interimResults = true; rec.maxAlternatives = 1;
+      rec.onresult = ev => { let t = ""; for (let k = 0; k < ev.results.length; k++) t += ev.results[k][0].transcript; said = t.trim(); $("live").textContent = "שומע: " + said; };
+      rec.onerror = ev => { $("live").textContent = SR_ERR[ev.error] || ("בעיה במיקרופון (" + ev.error + ")."); };
+      rec.onend = () => finish(said);
+      talking = { stop() { try { rec.stop(); } catch (e) { finish(said); } }, cancel() { said = ""; try { rec.abort(); } catch (e) {} finish(""); } };
+      talkState("listen");
+      setTimeout(() => { if (finished) return; try { rec.start(); } catch (e) { finish(""); } }, 250);
+      return;
+    }
+    // 3) Claude dictation (inside the Claude viewer)
+    if (dict) {
+      talkMode = true; talkHeard = "";
+      const quit = () => { if (!hands) dict.stop().catch(() => {}); };
+      talkDone = x => { quit(); finish(x); };
+      talking = { stop() { quit(); setTimeout(() => finish(talkHeard), 1500); }, cancel() { talkHeard = ""; quit(); finish(""); } };
+      talkState("listen");
+      if (hands) return;   // already listening
+      dict.start().catch(e => { $("live").textContent = e && e.code === "not_granted" ? "אין הרשאה למיקרופון." : "המיקרופון לא זמין כאן."; finish(""); });
+      return;
+    }
+    $("live").textContent = "בדפדפן הזה אין זיהוי דיבור. אפשר להשתמש בכפתורים, או לפתוח את האתר ב-Chrome.";
+    finish("");
+  });
+}
+
+$("talkBtn").addEventListener("click", async () => {
+  if (talking) { talking.stop(); return; }
+  if ($("talkBtn").classList.contains("busy")) return;
+  stopSpeaking();
+  const text = await listenOnce();
+  if (!text) { talkState("idle"); $("live").textContent = "לא שמעתי. לחץ שוב ודבר קרוב לטלפון."; return; }
+  await converse(text);
+});
+
+// What the app knows right now, for Claude
+function routeState() {
+  const st = stops.map((s, i) => `${i + 1}${i === cur ? " (current)" : i < cur ? " (done)" : ""}: ${s.end ? "checkouts" : s.section.id + " " + s.section.where + " -> " + s.items.join(", ")}`).join("\n");
+  return `Route stops:\n${st}\nCustomer location: ${here ? here.id + " " + here.where : "unknown (walking toward the current stop)"}`;
+}
+const BRAIN_RULES = `You are the voice of a shopping navigation app inside the Yochananof supermarket in Be'er Sheva. The customer talks to you in Hebrew while walking with a phone. Understand what they want, choose app actions, and give a short spoken answer.
+Store sections (id = name, where it is):
+${SECTIONS.map(s => `${s.id} = ${s.name}, ${s.where}${s.est ? " (location not confirmed)" : ""}`).join("\n")}
+Actions you can use:
+{"type":"where","name":"<product>","section":"<id>"}  customer asks where something is, or wants it now: the app goes there next (adds it to the list if missing)
+{"type":"add","items":[{"name":"<product>","section":"<id or null>"}]}  add to the list, placed at the best point of the route
+{"type":"remove","name":"<product as in the list>"}
+{"type":"next"} customer took the items or wants the next stop; {"type":"prev"}; {"type":"repeat"} repeat the current instruction
+{"type":"locate","section":"<id>"} customer says where they are standing now ("אני במעבר 8", "אני ליד הלחם")
+{"type":"mute"} / {"type":"unmute"}; {"type":"finish"} done shopping; {"type":"list"} read what is left
+Rules: answer in natural spoken Hebrew, one or two short sentences, no lists or symbols. Talk to the customer in a neutral, friendly way. Only use section ids from the list. If you are not sure where a product is, pick the most likely section and say it is probably there. If the customer asks something unrelated to shopping in this store, answer very briefly. Do not invent prices or stock. If no action fits, use an empty actions list.
+Reply with JSON only: {"actions":[...],"reply":"<Hebrew>"}`;
+function parsePlan(x) {
+  if (typeof x === "string") { const a = x.indexOf("{"), b = x.lastIndexOf("}"); if (a < 0 || b < a) return null; try { x = JSON.parse(x.slice(a, b + 1)); } catch (e) { return null; } }
+  if (!x || typeof x !== "object") return null;
+  return { actions: Array.isArray(x.actions) ? x.actions.filter(a => a && typeof a.type === "string").slice(0, 8) : [], reply: typeof x.reply === "string" ? x.reply.slice(0, 400) : "" };
+}
+async function askClaude(text) {
+  const past = history_.slice(-6).map(h => `${h.who === "user" ? "Customer" : "App"}: ${h.text}`).join("\n");
+  const user = `${routeState()}\n${past ? "Conversation so far:\n" + past + "\n" : ""}Customer now said: "${text}"`;
+  if (sample) return parsePlan(await sample.json(BRAIN_RULES + "\n\n" + user, { modelTier: "quick" }));
+  if (server.assist) {
+    const r = await fetch("api/claude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ system: BRAIN_RULES, messages: [{ role: "user", content: user }], max_tokens: 400 }) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return parsePlan(j && (j.text != null ? j.text : j));
+  }
+  return null;
+}
+// Simple rules when Claude is not available
+function localBrain(text) {
+  const t = clean(text);
+  const at = t.match(/^(?:אני|אנחנו)\s+(?:נמצא\s+|נמצאת\s+|עומד\s+|עומדת\s+)?(?:ב|ליד\s+|על\s+יד\s+)?(?:ה)?(מעבר\s*(.+)|.+)$/);
+  if (at) { const sec = whereFromWords(at[1]); if (sec) return { actions: [{ type: "locate", section: sec.id }] }; }
+  const add = t.match(/^(?:תוסיף|תוסיפי|הוסף|תכניס|תרשום|תרשמי|גם)\s+(?:לי\s+|לרשימה\s+|גם\s+)*(.+)$/);
+  if (add) return { actions: [{ type: "add", items: splitList(add[1].replace(/\s+וגם\s+|\s+גם\s+/g, ",")).map(n => ({ name: n.replace(/^ה(?=..)/, m => startsKw(n) ? m : ""), section: null })) }] };
+  const rm = t.match(/^(?:תוריד|תמחק|תמחקי|תורידי|בלי|לא צריך|לא צריכה|כבר יש לי)\s+(?:את\s+)?(.+)$/);
+  if (rm) return { actions: [{ type: "remove", name: rm[1] }] };
+  const ask = t.match(/^(?:איפה|איפוא|איפה יש|איפה נמצא(?:ת|ים|ות)?|איפה אני מוצא|אני צריך|אני צריכה|אני רוצה|תביא לי|תמצא לי|חפש|יש לכם|יש פה)\s+(.+)$/);
+  if (ask) return { actions: [{ type: "where", name: ask[1].replace(/^(?:את\s+)?/, ""), section: null }] };
+  if (/^(שקט|השתק|תשתוק|תשתקי|די)$/.test(t)) return { actions: [{ type: "mute" }] };
+  if (/^(דבר|תדבר|תדברי|החזר קול)$/.test(t)) return { actions: [{ type: "unmute" }] };
+  if (/^(סיימתי|סיימנו|סיום|קנייה חדשה)/.test(t)) return { actions: [{ type: "finish" }] };
+  if (/^(מה נשאר|מה עוד|מה ברשימה|תקריא|הרשימה)/.test(t)) return { actions: [{ type: "list" }] };
+  if (/^(מה הלאה|מה הבא|לאן עכשיו|לאן|שוב|חזור|מה לקחת|לא הבנתי)/.test(t)) return { actions: [{ type: "repeat" }] };
+  if (/^(הבא|הלאה|קדימה|לקחתי|יש לי|המשך|תמשיך)/.test(t)) return { actions: [{ type: "next" }] };
+  if (/^(הקודם|אחורה|תחזור אחורה)/.test(t)) return { actions: [{ type: "prev" }] };
+  if (t.split(" ").length <= 3 && matchSection(t)) return { actions: [{ type: "where", name: t, section: null }] };
+  return { actions: [], reply: "לא הבנתי. אפשר לומר למשל: איפה החלב, תוסיף ביצים, או הבא." };
+}
+const cleanName = n => { n = String(n || "").replace(/[?؟!.]/g, "").trim(); if (n.length > 3 && n[0] === "ה" && !startsKw(n) && matchSection(n.slice(1))) n = n.slice(1); return n.slice(0, 40); };
+const secFor = (name, id) => BYID[id] && BYID[id].stop && !BYID[id].end ? BYID[id] : (matchSection(name) ? BYID[matchSection(name)] : null);
+// "ב" + place, without doubling the article: "המאפייה" -> "במאפייה"
+const inPlace = w => "ב" + String(w).replace(/^ה(?=[א-ת])/, "");
+const posNow = () => here ? here.stop : cur > 0 ? stops[cur - 1].section.stop : ENTRANCE;
+// put an item on the route; goNow makes it the very next stop
+function placeItem(name, sec, goNow) {
+  if (!items.some(i => i.name === name && i.section === sec.id)) items.push({ name, section: sec.id });
+  renderItems();
+  let idx = stops.findIndex((s, i) => i >= cur && !s.end && s.section.id === sec.id);
+  let stop;
+  if (idx >= 0) { stop = stops[idx]; if (!stop.items.includes(name)) stop.items.push(name); }
+  else { stop = { section: sec, items: [name] }; stops.splice(stops.length - 1, 0, stop); }
+  if (goNow) { stops.splice(stops.indexOf(stop), 1); stops.splice(cur, 0, stop); here = null; }
+  else if (idx < 0) {
+    // new stop: re-plan the rest of the walk from here, keeping the current stop first
+    const done = stops.slice(0, cur), end = stops[stops.length - 1], rest = stops.slice(cur, -1);
+    const keep = rest.length > 1 && rest[0] !== stop;
+    stops = done.concat(orderStops(posNow(), rest, end.section.stop, keep), [end]);
+  }
+  return stops.indexOf(stop);
+}
+async function runPlan(plan, text) {
+  const notes = []; let moved = false;
+  for (const a of plan.actions) {
+    if (a.type === "where" || a.type === "add") {
+      const list = a.type === "where" ? [{ name: a.name, section: a.section }] : (Array.isArray(a.items) ? a.items : []);
+      for (const it of list.slice(0, 10)) {
+        const name = cleanName(it && it.name); if (!name) continue;
+        let sec = secFor(name, it.section);
+        if (!sec) { const g = (await speechToItems(name))[0]; sec = g && BYID[g.section]; }
+        if (!sec) { notes.push(`לא מצאתי איפה יש ${name}`); continue; }
+        if (a.type === "where") {
+          const already = stops.findIndex((s, i) => i >= cur && !s.end && s.section.id === sec.id);
+          if (already === cur) notes.push(`יש ${name} ${inPlace(sec.where)}, זו התחנה שאתה הולך אליה עכשיו`);
+          else { placeItem(name, sec, true); notes.push(`יש ${name} ${inPlace(sec.where)}. זו התחנה הבאה שלך. ${stopText(cur).turn}`); }
+        } else { const n = placeItem(name, sec, false); notes.push(`הוספתי ${name}, ${inPlace(sec.where)}, ` + (n === cur ? "בתחנה שאתה הולך אליה עכשיו" : `תחנה ${n + 1}`)); }
+        moved = true;
+      }
+    } else if (a.type === "remove") {
+      const q = cleanName(a.name); if (!q) continue;
+      const hit = items.find(i => i.name === q) || items.find(i => i.name.includes(q) || q.includes(i.name));
+      if (!hit) { notes.push(`${q} לא ברשימה`); continue; }
+      items = items.filter(i => i !== hit); renderItems();
+      const si = stops.findIndex(s => !s.end && s.items.includes(hit.name));
+      if (si >= 0) { const s = stops[si]; s.items = s.items.filter(x => x !== hit.name); if (!s.items.length) { stops.splice(si, 1); if (si < cur) cur--; cur = Math.min(cur, stops.length - 1); } }
+      notes.push(`הורדתי מהרשימה: ${hit.name}`); moved = true;
+    } else if (a.type === "next" || a.type === "prev") {
+      const n = Math.min(Math.max(cur + (a.type === "next" ? 1 : -1), 0), stops.length - 1);
+      if (n !== cur) { cur = n; here = null; moved = true; }
+      notes.push(stopText(cur).say);
+    } else if (a.type === "repeat") { notes.push(stopText(cur).say); }
+    else if (a.type === "locate") {
+      const sec = BYID[a.section] || (a.section && whereFromWords(String(a.section)));
+      if (sec && sec.stop) { here = sec; const done = stops.slice(0, cur), end = stops[stops.length - 1]; let rest = stops.slice(cur, -1); const mine = rest.findIndex(s => s.section.id === sec.id); if (mine >= 0) rest.unshift(rest.splice(mine, 1)[0]); stops = done.concat(orderStops(sec.stop, rest, end.section.stop, mine >= 0), [end]); moved = true; notes.push(stopText(cur).say); }
+    } else if (a.type === "mute") { setMuted(true); }
+    else if (a.type === "unmute") { setMuted(false); }
+    else if (a.type === "finish") { resetAll(); history_.length = 0; return; }
+    else if (a.type === "list") {
+      const left = stops.slice(cur).filter(s => !s.end);
+      const say3 = left.slice(0, 3).map(s => `${s.items.join(" ו")} ${inPlace(s.section.where.split(",")[0])}`).join(", אחר כך ");
+      notes.push(!left.length ? "לא נשאר כלום ברשימה, אפשר ללכת לקופות" : left.length <= 3 ? `נשארו ${left.length}: ${say3}` : `נשארו ${left.length} תחנות. הקרובות: ${say3}. את כל הרשימה רואים בתפריט למטה`);
+    }
+  }
+  if (moved) { renderNav(); updateShare(); }
+  // what the app actually did is the most reliable answer; Claude's words when there was nothing to report
+  const reply = notes.length ? notes.join(". ") : (plan.reply || "בסדר.");
+  history_.push({ who: "user", text }, { who: "app", text: reply }); history_.splice(0, history_.length - 8);
+  bubble(text, reply); $("live").textContent = "";
+  speak(reply);
+}
+async function converse(text) {
+  talkState("think"); bubble(text, "…");
+  let plan = null;
+  try { plan = await askClaude(text); } catch (e) { plan = null; }
+  if (!plan) plan = localBrain(text);
+  try { await runPlan(plan, text); } finally { talkState("idle"); }
 }
 
 // ---------- Boot ----------

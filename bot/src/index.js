@@ -6,6 +6,7 @@ import { DurableObject } from "cloudflare:workers";
 import { Buffer } from "node:buffer";
 import { handle, unknownNames, emptyState } from "./bot.js";
 import { sectionList, parseItems } from "./ai-parse.js";
+import { handleApi } from "./api.js";
 
 const GRAPH = env => `${env.GRAPH_BASE || "https://graph.facebook.com"}/${env.GRAPH_VERSION || "v23.0"}`;
 const AI_PER_DAY = 40; // photo / voice / AI lookups per customer per day, protects the free AI quota
@@ -33,6 +34,7 @@ export default {
       }
       return new Response("ok"); // answer Meta right away; the reply is sent in the background
     }
+    if (url.pathname.startsWith("/api/")) return handleApi(request, env, url);
     if (url.pathname === "/health") return Response.json({ ok: true, token: !!env.WHATSAPP_TOKEN, secret: !!env.APP_SECRET, ai: !!env.AI });
     return env.ASSETS.fetch(request);
   },

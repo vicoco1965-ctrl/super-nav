@@ -99,3 +99,13 @@ test("AI answers in different shapes are parsed", async () => {
   assert.deepEqual(parseItems({ choices: [{ message: { content: '{"items":[]}' } }] }), []);
   assert.deepEqual(parseItems({ response: "no json here" }), []);
 });
+
+test("paid endpoints only answer the site itself", async () => {
+  const { sameSite } = await import("../src/api.js");
+  const url = new URL("https://super-nav.x.workers.dev/api/claude");
+  const req = h => ({ headers: new Headers(h) });
+  assert.equal(sameSite(req({ origin: "https://super-nav.x.workers.dev" }), url), true);
+  assert.equal(sameSite(req({ origin: "https://evil.example" }), url), false);
+  assert.equal(sameSite(req({ "sec-fetch-site": "same-origin" }), url), true);
+  assert.equal(sameSite(req({}), url), false);
+});
