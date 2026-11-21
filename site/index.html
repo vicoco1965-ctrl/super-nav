@@ -157,6 +157,11 @@ body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding
 .linkbtn{min-height:0;padding:4px 10px;font-size:14px}
 #mWalls{display:flex;flex-direction:column;gap:10px}
 @media (max-width:420px){.arow{grid-template-columns:auto 1fr auto auto}.arow input:nth-of-type(2){grid-column:2/3}}
+.inapp{position:fixed;inset-inline:10px;top:10px;z-index:50;background:#14231d;color:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 6px 24px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:10px;font-size:16px;line-height:1.5}
+.inapp .arrow{position:absolute;top:-2px;inset-inline-start:14px;font-size:30px;animation:bob 1s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-6px)}}
+.inapp button{align-self:flex-start;min-height:40px;font-size:15px}
+#shareEnd{min-height:52px;font-size:18px}
 .map .wall{fill:none;stroke:var(--muted);stroke-width:2}
 .hands{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .live{font-size:14px;color:var(--muted)}
@@ -269,6 +274,7 @@ body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding
         <button id="nextBtn" class="primary" type="button" aria-label="התחנה הבאה">הבא ▸</button>
         <button id="finishBtn" class="primary" type="button" hidden>🏁 סיום</button>
       </div>
+      <button id="shareEnd" class="wa" type="button" hidden>💚 שתף עם חבר בוואטסאפ</button>
       <p class="appnote" id="appNote2" hidden></p>
       <p class="live" id="live">לחץ "דבר איתי" ושאל: "איפה החלב?", "תוסיף ביצים", "מה הלאה?"</p>
       <details class="drawer" id="drawer">
@@ -295,6 +301,9 @@ body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding
         <div class="row">
           <a class="btn wa grow" id="waBtn" href="#" target="_blank" rel="noopener">שלח מסלול בוואטסאפ</a>
           <button class="grow" id="copyBtn" type="button">העתק מסלול</button>
+        </div>
+        <div class="row">
+          <button class="grow wa" id="shareFriend" type="button">💚 שתף את האפליקציה עם חבר</button>
         </div>
         <p class="note" id="voiceNote"></p>
         <p class="note" id="brainNote"></p>
@@ -687,7 +696,7 @@ function renderNav() {
   $("prevBtn").disabled = cur === 0;
   $("nextBtn").disabled = cur >= stops.length - 1;
   const atEnd = !!(stops[cur] && stops[cur].end) && stops.length > 1;
-  $("nextBtn").hidden = atEnd; $("finishBtn").hidden = !atEnd;
+  $("nextBtn").hidden = atEnd; $("finishBtn").hidden = !atEnd; $("shareEnd").hidden = !atEnd;
   drawMap(); renderSteps(); fitMap();
   if (view3d && mapMode !== "2d") update3d();
 }
@@ -1424,7 +1433,7 @@ function listenOnce() {
       try { rec = new SRClass(); } catch (e) { finish(""); return; }
       rec.lang = "he-IL"; rec.continuous = false; rec.interimResults = true; rec.maxAlternatives = 1;
       rec.onresult = ev => { let t = ""; for (let k = 0; k < ev.results.length; k++) t += ev.results[k][0].transcript; said = t.trim(); $("live").textContent = "שומע: " + said; };
-      rec.onerror = ev => { $("live").textContent = SR_ERR[ev.error] || ("בעיה במיקרופון (" + ev.error + ")."); };
+      rec.onerror = ev => { $("live").textContent = SR_ERR[ev.error] || ("בעיה במיקרופון (" + ev.error + ")."); if (IN_APP) showOpenInBrowser(); };
       rec.onend = () => finish(said);
       talking = { stop() { try { rec.stop(); } catch (e) { finish(said); } }, cancel() { said = ""; try { rec.abort(); } catch (e) {} finish(""); } };
       talkState("listen");
@@ -1443,13 +1452,14 @@ function listenOnce() {
       return;
     }
     $("live").textContent = "בדפדפן הזה אין זיהוי דיבור. אפשר להשתמש בכפתורים, או לפתוח את האתר ב-Chrome.";
+    if (IN_APP) showOpenInBrowser();
     finish("");
   });
 }
 
 $("talkBtn").addEventListener("click", async () => {
   if (talking) { talking.stop(); return; }
-  if (!dict && !SRClass && !server.stt) { bubble("", window.claude ? "כאן אין מיקרופון. פתח את הקישור בדפדפן Chrome כדי לדבר עם הניווט." : "בדפדפן הזה אין זיהוי דיבור. נסה את Chrome."); return; }
+  if (!dict && !SRClass && !server.stt) { if (IN_APP) showOpenInBrowser(); bubble("", window.claude ? "כאן אין מיקרופון. פתח את הקישור בדפדפן Chrome כדי לדבר עם הניווט." : "בדפדפן הזה אין זיהוי דיבור. נסה את Chrome."); return; }
   if ($("talkBtn").classList.contains("busy")) return;
   stopSpeaking();
   const text = await listenOnce();
@@ -2251,6 +2261,52 @@ async function loadStats() {
 }
 const PUBLIC_SITE = "";   // the public site address, once it is live (e.g. https://super-nav.example.workers.dev/)
 if (/[?&]mapper\b/.test(location.search) || location.hash === "#mapper") setTimeout(openMapper, 0);
+
+// ---------- Opening from WhatsApp: leave the in-app browser, and share with friends ----------
+const UA = navigator.userAgent || "";
+const IN_APP = /WhatsApp|FBAN|FBAV|FB_IAB|Instagram|Line\/|; wv\)/i.test(UA) && !window.claude;
+const IS_ANDROID = /Android/i.test(UA), IS_IOS = /iPhone|iPad|iPod/i.test(UA);
+(function leaveInAppBrowser() {
+  // the store link's #part can't ride through an Android intent, so it travels as ?h= and is put back here
+  const q = new URLSearchParams(location.search);
+  if (q.has("h")) { const h = q.get("h"); q.delete("h"); q.delete("ext"); const rest = q.toString();
+    try { history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "") + (h ? "#" + h : "")); } catch (e) {} }
+  if (!IN_APP) return;
+  if (IS_ANDROID && !q.has("ext")) {
+    const back = new URLSearchParams(location.search); back.set("ext", "1"); if (location.hash) back.set("h", location.hash.slice(1));
+    const target = location.host + location.pathname + "?" + back.toString();
+    const fallback = location.origin + location.pathname + "?" + back.toString();
+    location.href = "intent://" + target + "#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=" + encodeURIComponent(fallback) + ";end";
+    setTimeout(() => showOpenInBrowser(), 1500);   // if Chrome didn't open, explain how
+    return;
+  }
+  setTimeout(() => showOpenInBrowser(), 600);
+})();
+function showOpenInBrowser() {
+  if ($("inappTip")) return;
+  const d = document.createElement("div"); d.className = "inapp"; d.id = "inappTip"; d.setAttribute("role", "dialog");
+  const how = IS_IOS ? "לחץ על ⋯ או על סמל המצפן למטה, ובחר \"פתח ב-Safari\"." : "לחץ על ⋮ למעלה, ובחר \"פתח ב-Chrome\" או \"פתח בדפדפן\".";
+  d.innerHTML = '<span class="arrow" aria-hidden="true">⬆️</span><b>כדי שהמיקרופון והקול יעבדו, פתח בדפדפן</b><span></span>';
+  d.querySelector("span:last-of-type").textContent = how;
+  const b = document.createElement("button"); b.type = "button"; b.textContent = "הבנתי"; b.onclick = () => d.remove(); d.appendChild(b);
+  if (IS_IOS) { d.style.top = "auto"; d.style.bottom = "10px"; d.querySelector(".arrow").textContent = "⬇️"; d.querySelector(".arrow").style.top = "auto"; d.querySelector(".arrow").style.bottom = "-4px"; }
+  document.body.appendChild(d);
+}
+// a link to this store that a friend can open
+async function storeLink() {
+  const base = PUBLIC_SITE || siteBase();
+  if (STORE.slug && !window.claude) return base + "s/" + STORE.slug;
+  if (STORE.generated && STORE.spec) return base + "#store=" + await packSpec(STORE.spec);
+  return base;
+}
+async function shareWithFriend() {
+  const link = await storeLink();
+  const text = `🛒 מצאתי אפליקציה שמנווטת בתוך ${STORE.title}: מצלמים או אומרים את רשימת הקניות, ומקבלים מסלול עם הוראות קוליות עד הקופה. נסו: ${link}`;
+  hit("share");
+  window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
+}
+$("shareFriend").addEventListener("click", shareWithFriend);
+$("shareEnd").addEventListener("click", shareWithFriend);
 
 // ---------- Boot ----------
 // a new visit always starts with an empty list (nothing is kept from an earlier trip)

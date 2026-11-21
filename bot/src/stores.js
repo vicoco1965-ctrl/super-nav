@@ -4,11 +4,11 @@
 //   GET  /api/stores/:slug         the stored spec JSON, or 404
 //   PUT  /api/stores/:slug         save a spec (Authorization: Bearer ADMIN_TOKEN)
 //   GET  /api/stores/:slug/stats   usage counters (admin)
-//   POST /api/hit                  {slug, ev: open|start|finish} -> 204
+//   POST /api/hit                  {slug, ev: open|start|finish|share} -> 204
 import { DurableObject } from "cloudflare:workers";
 
 export const SLUG_RE = /^[a-z0-9-]{1,48}$/;
-const EVENTS = ["open", "start", "finish"];
+const EVENTS = ["open", "start", "finish", "share"];
 const MAX_SPEC = 64 * 1024;
 
 export function storeTitle(spec, slug) {
@@ -35,7 +35,7 @@ export class StoreDB extends DurableObject {
   }
   stats(slug, since7) {
     const rows = this.sql.exec(`SELECT day, ev, n FROM hits WHERE slug = ? ORDER BY day DESC`, slug).toArray();
-    const zero = () => ({ open: 0, start: 0, finish: 0 });
+    const zero = () => ({ open: 0, start: 0, finish: 0, share: 0 });
     const total = zero(), last7 = zero(), byDay = new Map();
     for (const { day, ev, n } of rows) {
       total[ev] += n;
