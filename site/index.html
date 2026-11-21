@@ -1360,60 +1360,196 @@ function label(T, text, opts = {}) {
   if (opts.depthTest === false) sp.renderOrder = 10;
   return sp;
 }
+// signboard texture: colored header strip, big emoji, name; rendered at high resolution for sharp text
+function signboard(T, icon, text, color, on) {
+  const s = 4, W = 200, H = 74, c = document.createElement("canvas"), g = c.getContext("2d");
+  c.width = W * s; c.height = H * s; g.scale(s, s);
+  const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  g.fillStyle = "rgba(0,0,0,0.18)"; rr(3, 5, W - 6, H - 7, 14); g.fill();
+  g.fillStyle = on ? "#ffd84a" : "#ffffff"; rr(2, 2, W - 6, H - 8, 14); g.fill();
+  g.save(); rr(2, 2, W - 6, H - 8, 14); g.clip(); g.fillStyle = color; g.fillRect(2, 2, W, 9); g.restore();
+  g.font = "40px 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(icon, W - 36, H / 2 + 3);
+  g.direction = "rtl"; g.textAlign = "right"; g.fillStyle = "#1d2420";
+  let size = 26; g.font = `700 ${size}px Assistant, Arial, sans-serif`;
+  while (g.measureText(text).width > W - 82 && size > 15) { size -= 1; g.font = `700 ${size}px Assistant, Arial, sans-serif`; }
+  g.fillText(text, W - 66, H / 2 + 4);
+  const tex = new T.CanvasTexture(c); tex.anisotropy = 4; tex.minFilter = T.LinearFilter;
+  const sp = new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true }));
+  sp.scale.set(W * 0.27, H * 0.27, 1); return sp;
+}
+// seeded random so the shelves look the same every time
+function rng(seed) { let x = seed >>> 0 || 1; return () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return ((x >>> 0) % 100000) / 100000; }; }
+const PAL = {
+  dairy: [0xffffff, 0xf4f7fb, 0x3d7fd6, 0x8cc3f0, 0xffe27a, 0xe8f0f8], greens: [0x4f9d3a, 0x6dbb4c, 0x2f7d32, 0x9ccc65],
+  nuts: [0xb5835a, 0xd2a679, 0x8d5a34, 0xe6c79c], ddeli: [0xf6d365, 0xf2c14e, 0xfff2c4, 0xe8b04a], bakery: [0xd9a05b, 0xc0803e, 0xe8c07d, 0xa86b32],
+  meat: [0xc0392b, 0xe57373, 0xf5b7b1, 0xd35400], frozen: [0x86c5ff, 0xffffff, 0x4a90d9, 0xff8a80, 0xb3e5fc], home: [0xb0bec5, 0x90a4ae, 0xeceff1, 0x546e7a, 0xff8a65],
+  drinks: [0xd32f2f, 0x1e88e5, 0x43a047, 0xfb8c00, 0x8e24aa, 0x00acc1, 0xfdd835], beer: [0xa1661b, 0x2e7d32, 0xc28a2c, 0x5d4037],
+  produce: [0xe53935, 0xfdd835, 0xfb8c00, 0x7cb342, 0x8e24aa, 0x43a047, 0xffb300],
+};
+const AISLE_PAL = [[0xf4a261, 0xe9c46a, 0xd62828, 0x6a994e], [0x8d5524, 0xc68642, 0xf1c27d, 0xe63946], [0x6f1d1b, 0xbb9457, 0xe63946, 0x432818],
+  [0xfca311, 0xe63946, 0x1d3557, 0xffd166], [0xf1faee, 0xa8dadc, 0xe9d8a6, 0x94d2bd], [0x2a9d8f, 0xe76f51, 0xf4a261, 0x264653], [0xbdbdbd, 0x9e9e9e, 0xe0e0e0],
+  [0xef476f, 0xffd166, 0x06d6a0, 0x118ab2], [0x48cae4, 0xffffff, 0x0077b6, 0xff006e], [0xcdb4db, 0xffc8dd, 0xbde0fe, 0xa2d2ff], [0x0077b6, 0x00b4d8, 0xffffff, 0x90e0ef],
+  [0x8338ec, 0x3a86ff, 0xffbe0b, 0x2b2d42], [0xffffff, 0xf8f9fa, 0xe63946, 0x457b9d], [0x6a040f, 0x9d0208, 0xffba08, 0x370617]];
+const DEPT_ACCENT = { produce: "#4caf50", greens: "#2e7d32", nuts: "#a1683a", dairy: "#2f80d1", ddeli: "#f2a900", bakery: "#c47f2c", meat: "#c0392b",
+  frozen: "#4fb3e8", drinks: "#7e57c2", home: "#78909c", beer: "#d4a017" };
 function build3d(T) {
   const host = $("map3d");
-  const renderer = new T.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "low-power" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "default" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap; renderer.shadowMap.autoUpdate = false;  // the store doesn't move: draw shadows once
   host.appendChild(renderer.domElement);
-  const scene = new T.Scene(); scene.background = new T.Color(0xdfe8ee);
-  scene.fog = new T.Fog(0xdfe8ee, 500, 1100);
+  const scene = new T.Scene();
+  { const c = document.createElement("canvas"); c.width = 4; c.height = 256; const g = c.getContext("2d"); const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, "#cfe0ea"); gr.addColorStop(1, "#f4f1ea"); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); const t = new T.CanvasTexture(c); scene.background = t; }
+  scene.fog = new T.Fog(0xe9ece8, 520, 1200);
   const camera = new T.PerspectiveCamera(50, 1, 2, 3000);
-  scene.add(new T.HemisphereLight(0xffffff, 0x8a9a92, 0.85));
-  const sun = new T.DirectionalLight(0xffffff, 0.55); sun.position.set(-200, 400, 300); scene.add(sun);
-  const box = (x, z, w, d, h, color, y0 = 0) => {
-    const m = new T.Mesh(new T.BoxGeometry(w, h, d), new T.MeshLambertMaterial({ color }));
-    m.position.set(x + w / 2, y0 + h / 2, z + d / 2); scene.add(m); return m;
-  };
-  // floor and walls
-  const floor = new T.Mesh(new T.PlaneGeometry(340, 650), new T.MeshLambertMaterial({ color: 0xf3f5f2 }));
-  floor.rotation.x = -Math.PI / 2; floor.position.set(180, 0, 335); scene.add(floor);
-  const wallC = 0xc4ccc7;
-  box(8, 8, 344, 3, 12, wallC); box(8, 658, 210, 3, 12, wallC); box(8, 8, 3, 653, 12, wallC); box(349, 8, 3, 653, 12, wallC);
-  // promo foyer
-  box(230, 596, 115, 60, 1.2, 0xeadfc6);
+  scene.add(new T.HemisphereLight(0xffffff, 0xaab3ad, 0.8));
+  const sun = new T.DirectionalLight(0xfff8ee, 0.55); sun.position.set(110, 420, 520); sun.target.position.set(180, 0, 330);
+  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0008; sun.shadow.radius = 4;
+  Object.assign(sun.shadow.camera, { left: -420, right: 420, top: 420, bottom: -420, near: 50, far: 1400 });
+  scene.add(sun, sun.target);
+  const mats = {};
+  const mat = (color, o = {}) => { const k = color + JSON.stringify(o); return mats[k] || (mats[k] = new T.MeshLambertMaterial(Object.assign({ color }, o))); };
+  // every solid block is one instance of a single box batch (few draw calls keep phones smooth)
+  const solids = [];
+  const box = (x, z, w, d, h, color, y0 = 0) => { solids.push({ x: x + w / 2, y: y0 + h / 2, z: z + d / 2, sx: w, sy: h, sz: d, color, ry: 0 }); };
+  // tiled floor
+  { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
+    g.fillStyle = "#efece6"; g.fillRect(0, 0, 128, 128); g.fillStyle = "#e6e2da"; g.fillRect(0, 0, 64, 64); g.fillRect(64, 64, 64, 64);
+    g.strokeStyle = "#d6d1c7"; g.lineWidth = 2; g.strokeRect(0, 0, 64, 64); g.strokeRect(64, 64, 64, 64); g.strokeRect(64, 0, 64, 64); g.strokeRect(0, 64, 64, 64);
+    const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(340 / 24, 650 / 24); t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const floor = new T.Mesh(new T.PlaneGeometry(340, 650), new T.MeshLambertMaterial({ map: t }));
+    floor.rotation.x = -Math.PI / 2; floor.position.set(180, 0, 335); floor.receiveShadow = true; scene.add(floor);
+    const out = new T.Mesh(new T.PlaneGeometry(2400, 2400), new T.MeshLambertMaterial({ color: 0xd9ddd6 })); out.rotation.x = -Math.PI / 2; out.position.set(180, -0.2, 335); scene.add(out); }
+  // walls with a green band
+  const wall = 0xf2f0eb, band = 0x2e7d5b;
+  for (const [x, z, w, d] of [[6, 6, 348, 4], [6, 656, 214, 4], [6, 6, 4, 654], [350, 6, 4, 654]]) { box(x, z, w, d, 26, wall); box(x - 0.3, z - 0.3, w + 0.6, d + 0.6, 4, band, 22); }
+  box(230, 596, 115, 60, 0.6, 0xe8dcc2);       // promo foyer mat
+  for (const [x, z] of [[246, 610], [276, 626], [310, 608]]) { box(x, z, 18, 14, 9, 0xd84a3a); box(x + 1, z + 1, 16, 12, 2, 0xffc94a, 9); }  // promo bins
+  // product instances, gathered and drawn in a few batches
+  const P = { solid: solids, box: [], bottle: [], ball: [] };
+  const put = (kind, x, y, z, sx, sy, sz, color, ry = 0) => P[kind].push({ x, y, z, sx, sy, sz, color, ry });
+  const R = rng(20261121);
+  const pick = pal => pal[Math.floor(R() * pal.length)];
+  // a shelf run: base, back panel, shelf boards, products facing both long sides (or one side against a wall)
+  function gondola(x, z, w, d, h, levels, pal, kind = "box", sides = 2, frame = 0xe9ebe8) {
+    const alongX = w >= d, len = alongX ? w : d, depth = alongX ? d : w;
+    box(x, z, w, d, 2.2, 0x56605b);
+    if (alongX) box(x, z + d / 2 - 0.4, w, 0.8, h, frame); else box(x + w / 2 - 0.4, z, 0.8, d, h, frame);
+    const gap = (h - 3) / levels;
+    for (let l = 0; l < levels; l++) {
+      const y = 2.2 + l * gap;
+      if (l) { if (alongX) box(x, z, w, d, 0.5, frame, y - 0.5); else box(x, z, w, d, 0.5, frame, y - 0.5); }
+      for (let side = 0; side < sides; side++) {
+        let at = 0.6;
+        while (at < len - 1.2) {
+          const pw = kind === "bottle" ? 2.2 : 1.8 + R() * 1.8, ph = Math.min(gap - 1, (kind === "bottle" ? 0.75 : 0.45) * gap + R() * 0.35 * gap), pd = depth / 2 - 1;
+          if (at + pw > len - 0.6) break;
+          const off = side ? -1 : 1, c = pick(pal);
+          const n = kind === "box" ? 1 : 1;
+          for (let k = 0; k < n; k++) {
+            const u = at + pw / 2, v = depth / 2 + off * (pd / 2 + 0.5);
+            const px = alongX ? x + u : x + v, pz = alongX ? z + v : z + u;
+            put(kind, px, y + ph / 2, pz, alongX ? pw - 0.3 : pd, ph, alongX ? pd : pw - 0.3, c);
+          }
+          at += pw + (R() < 0.08 ? 1.5 : 0.1);
+        }
+      }
+    }
+  }
+  // glass-front fridge along a wall: dark body, lit inside, products, a glass pane
+  function fridge(x, z, w, d, h, pal, kind = "box") {
+    const alongX = w >= d;
+    if (alongX) box(x, z + d * 0.4, w, d * 0.2, 2.5, 0x2f6f5a, h); else box(x + w * 0.4, z, w * 0.2, d, 2.5, 0x2f6f5a, h);   // light canopy over the middle
+    if (alongX) { box(x - 1, z, 1.2, d, h + 3, 0x3e4a46); box(x + w - 0.2, z, 1.2, d, h + 3, 0x3e4a46); }
+    else { box(x, z - 1, w, 1.2, h + 3, 0x3e4a46); box(x, z + d - 0.2, w, 1.2, h + 3, 0x3e4a46); }
+    gondola(x + (alongX ? 0 : 0.5), z + (alongX ? 0.5 : 0), w - (alongX ? 0 : 1), d - (alongX ? 1 : 0), h - 2, 5, pal, kind, 2, 0xf5f7f8);
+    const glass = new T.Mesh(new T.BoxGeometry(alongX ? w : d + 0.4, h - 3, 0.4).applyMatrix4(new T.Matrix4().makeRotationY(alongX ? 0 : Math.PI / 2)),
+      new T.MeshPhongMaterial({ color: 0xcfeaff, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, depthWrite: false }));
+    glass.position.set(x + w / 2, (h - 3) / 2 + 1.5, z + d / 2); scene.add(glass);
+  }
+  function counter(x, z, w, d, pal) {   // deli counter: white base, glass top, food inside
+    box(x, z, w, d, 9, 0xf3f3f1); box(x, z, w, 1.2, 9, 0x8b5e3c, 0);
+    const alongX = w >= d, n = Math.floor((alongX ? w : d) / 4);
+    for (let i = 0; i < n; i++) { const u = 2 + i * 4; put("box", alongX ? x + u : x + d / 2, 10, alongX ? z + d / 2 : z + u, 3.2, 1.6, 3.2, pick(pal)); }
+    const glass = new T.Mesh(new T.BoxGeometry(w - 1, 5, d - 1), new T.MeshPhongMaterial({ color: 0xdff2ff, transparent: true, opacity: 0.25, shininess: 100, depthWrite: false }));
+    glass.position.set(x + w / 2, 11.5, z + d / 2); scene.add(glass);
+  }
+  function chest(x, z, w, d, pal) {   // low freezer with a glass lid
+    box(x, z, w, d, 7, 0xf7f9fa); box(x, z, w, d, 0.8, 0x5aa9d6, 7);
+    for (let u = 1.5; u < w - 1.5; u += 2.6) for (let v = 1.5; v < d - 1.2; v += 2.6) put("box", x + u, 6.2, z + v, 2.3, 1.4, 2.3, pick(pal));
+    const glass = new T.Mesh(new T.BoxGeometry(w - 0.6, 0.3, d - 0.6), new T.MeshPhongMaterial({ color: 0xe6f6ff, transparent: true, opacity: 0.3, shininess: 120, depthWrite: false }));
+    glass.position.set(x + w / 2, 8.2, z + d / 2); scene.add(glass);
+  }
+  function produceTables(x, z, w, d) {   // tilted crates of fruit and vegetables
+    const tw = 30, td = 20;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) {
+      const tx = x + 6 + i * 37, tz = z + 6 + j * 25; if (tx + tw > x + w || tz + td > z + d) continue;
+      box(tx, tz, tw, td, 5, 0x8a6a4a);
+      for (let cx = 0; cx < 3; cx++) for (let cz = 0; cz < 2; cz++) {
+        const bx = tx + 1 + cx * 9.6, bz = tz + 1 + cz * 9.4, c = pick(PAL.produce);
+        box(bx, bz, 9, 9, 1.6, 0xb58a5c, 5);
+        for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) put("ball", bx + 1.7 + a * 2.8, 7.6 + R() * 0.5, bz + 1.7 + b * 2.8, 1.5, 1.5, 1.5, c);
+      }
+    }
+  }
+  // the store, department by department (same footprints as the flat map)
+  const signs = {};
   const tags = [];
-  const addTag = (sp, x, y, z) => { sp.position.set(x, y, z); scene.add(sp); tags.push(sp); return sp; };
-  addTag(label(T, "▲ כניסה", { bg: "rgba(15,107,82,0.95)", fg: "#fff" }), 300, 14, 680);
-  // departments: colored blocks with an icon and a name floating above
-  const highlight = {};
+  const addSign = (id, icon, text, x, y, z, accent) => {
+    const off = signboard(T, icon, text, accent, false), onS = signboard(T, icon, text, accent, true);
+    for (const sp of [off, onS]) { sp.position.set(x, y, z); scene.add(sp); tags.push(sp); }
+    onS.visible = false; signs[id] = { off, on: onS };
+    const pole = new T.Mesh(new T.CylinderGeometry(0.25, 0.25, 30), mat(0x6b736f)); pole.position.set(x, y + 20, z); scene.add(pole);
+  };
+  const B = BYID;
+  produceTables(...B.produce.rect.slice(0, 4));
+  fridge(B.greens.rect[0], B.greens.rect[1], B.greens.rect[2], B.greens.rect[3], 20, PAL.greens);
+  gondola(...B.nuts.rect.slice(0, 4), 12, 3, PAL.nuts, "box", 1);
+  fridge(B.dairy.rect[0], B.dairy.rect[1], B.dairy.rect[2], B.dairy.rect[3], 22, PAL.dairy);
+  fridge(B.dairy.side[0], B.dairy.side[1], B.dairy.side[2], B.dairy.side[3], 22, PAL.dairy);
+  counter(...B.ddeli.rect.slice(0, 4), PAL.ddeli);
+  gondola(...B.bakery.rect.slice(0, 4), 15, 4, PAL.bakery, "box", 2, 0xc8a27a);
+  counter(...B.meat.rect.slice(0, 4), PAL.meat);
+  chest(...B.frozen.rect.slice(0, 4), PAL.frozen); chest(...B.frozen.rect2.slice(0, 4), PAL.frozen);
+  gondola(...B.drinks.rect.slice(0, 4), 20, 5, PAL.drinks, "bottle", 2);
+  gondola(...B.home.rect.slice(0, 4).map((v, i) => i === 3 ? 30 : v), 14, 4, PAL.home);
+  gondola(B.home.rect[0], B.home.rect[1] + 40, B.home.rect[2], 30, 14, 4, PAL.home);
+  { const r = B.beer.row; gondola(r[0], r[1], r[2], 4, 14, 4, PAL.beer, "bottle", 1); gondola(r[0], r[1] + r[3] - 4, r[2], 4, 14, 4, PAL.beer, "bottle", 1); }
+  for (let i = 1; i <= 14; i++) { const y = AY(i); gondola(70, y + 6, 57, 6, 15, 4, AISLE_PAL[i - 1]); gondola(143, y + 6, 72, 6, 15, 4, AISLE_PAL[i - 1]); }
+  // checkouts: counters with a dark belt and a small screen
+  for (let k = 0; k < 4; k++) { const z = 528 + k * 31; box(14, z, 26, 8, 8, 0xdfe3e1); box(15, z + 1.5, 24, 5, 0.6, 0x2b2f2e, 8); box(34, z + 1, 1, 4, 6, 0x37474f, 8.6); }
+  // product batches
+  const geo = { solid: new T.BoxGeometry(1, 1, 1), box: new T.BoxGeometry(1, 1, 1), bottle: new T.CylinderGeometry(0.42, 0.5, 1, 6, 1), ball: new T.IcosahedronGeometry(0.55, 0) };
+  const dummy = new T.Object3D(), col = new T.Color();
+  let count = 0;
+  for (const kind in P) {
+    const list = P[kind]; if (!list.length) continue; if (kind !== "solid") count += list.length;
+    const im = new T.InstancedMesh(geo[kind], new T.MeshLambertMaterial({ color: 0xffffff }), list.length);
+    list.forEach((p, i) => { dummy.position.set(p.x, p.y, p.z); dummy.rotation.set(0, p.ry, 0); dummy.scale.set(p.sx, p.sy, p.sz); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); im.setColorAt(i, col.setHex(p.color)); });
+    im.castShadow = kind !== "ball"; im.receiveShadow = true; scene.add(im);
+  }
+  // hanging signs
   for (const s of SECTIONS) {
-    const r = s.rect || s.row; if (!r) continue;
-    const color = DEPT_COLOR[s.id] || 0xa0b0a8, h = DEPT_H[s.id] || 12;
-    const parts = [];
-    if (s.row) { // beer: shelves on both sides of the row
-      parts.push(box(r[0], r[1], r[2], 4, h, color), box(r[0], r[1] + r[3] - 4, r[2], 4, h, color));
-    } else parts.push(box(r[0], r[1], r[2], r[3], h, color));
-    for (const extra of [s.side, s.rect2]) if (extra) parts.push(box(extra[0], extra[1], extra[2], extra[3], h, color));
-    highlight[s.id] = { parts, color, rect: r };
-    const cx = r[0] + r[2] / 2, cz = r[1] + r[3] / 2;
-    addTag(label(T, `${s.num} ${s.short.replace(" ?", "")}`, { border: "#" + color.toString(16).padStart(6, "0") }), cx, h + 16, cz);
+    const r = s.rect || s.row; if (!r || s.aisle) continue;
+    const label = s.short.replace(" ?", "");
+    addSign(s.id, s.num === "❄" ? "❄️" : s.num, label, r[0] + r[2] / 2, (DEPT_H[s.id] || 12) + 20, r[1] + r[3] / 2, DEPT_ACCENT[s.id] || "#2e7d5b");
   }
-  // aisles: two shelf runs per row, colored per aisle, with the yellow-red aisle number like the store's signs
   for (let i = 1; i <= 14; i++) {
-    const y = AY(i), s = BYID["a" + i], color = AISLE_COLOR[i - 1];
-    const parts = [box(70, y + 6, 57, 6, 15, color), box(143, y + 6, 72, 6, 15, color)];
-    highlight[s.id] = { parts, color, rect: [70, y - 8, 145, 16] };
-    addTag(label(T, String(i), { bg: "#ffd200", fg: "#c4161c", border: "#c4161c", size: 30, scale: 0.36 }), 100, 30, y);
-    addTag(label(T, s.short, { size: 20, scale: 0.34, fg: s.est ? "#b5481d" : "#2b302d" }), 182, 24, y);
+    const s = BYID["a" + i], y = AY(i);
+    const num = label(T, String(i), { bg: "#ffd200", fg: "#c4161c", border: "#c4161c", size: 30, scale: 0.34 }); num.position.set(100, 30, y); scene.add(num); tags.push(num);
+    const nm = label(T, s.short, { size: 19, scale: 0.32, fg: s.est ? "#b5481d" : "#2b302d", bg: "rgba(255,255,255,0.92)" }); nm.position.set(182, 26, y); scene.add(nm); tags.push(nm);
+    signs[s.id] = { off: nm, on: null };
   }
-  // checkouts
-  box(14, 522, 30, 50, 9, 0x8f9a95); box(14, 576, 30, 78, 9, 0x6f7a75);
-  addTag(label(T, "🛒 קופות", {}), 29, 26, 590);
+  const ent = label(T, "▲ כניסה", { bg: "rgba(46,125,91,0.95)", fg: "#fff" }); ent.position.set(300, 14, 682); scene.add(ent); tags.push(ent);
+  const co = signboard(T, "🛒", "קופות", "#455a64", false); co.position.set(28, 30, 590); scene.add(co); tags.push(co);
   // dynamic layer: route, stops, you
   const dyn = new T.Group(); scene.add(dyn);
-  const glow = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.55, depthWrite: false }));
-  glow.rotation.x = -Math.PI / 2; glow.position.y = 0.3; scene.add(glow);
-  view3d = { T, renderer, scene, camera, dyn, glow, highlight, tags, host, cam: null, camFrom: null, camT: 1, chevrons: [], pin: null, you: null, raf: 0, lastFrame: 0, overview: false };
+  const glowTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d"); const gr = g.createRadialGradient(64, 64, 10, 64, 64, 64); gr.addColorStop(0, "rgba(255,216,74,0.85)"); gr.addColorStop(1, "rgba(255,216,74,0)"); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new T.CanvasTexture(c); })();
+  const glow = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false }));
+  glow.rotation.x = -Math.PI / 2; glow.position.y = 0.35; scene.add(glow);
+  renderer.shadowMap.needsUpdate = true;
+  view3d = { T, renderer, scene, camera, dyn, glow, signs, tags, host, cam: null, camFrom: null, camT: 1, chevrons: [], pin: null, you: null, raf: 0, lastFrame: 0, overview: false, products: count };
   const ro = new ResizeObserver(() => size3d()); ro.observe(host);
   size3d();
 }
@@ -1432,6 +1568,7 @@ function ribbon(T, path, width, color, y, opacity = 1) {
     const m = new T.Mesh(new T.BoxGeometry(len + width, 0.4, width), mat);
     m.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); m.rotation.y = -Math.atan2(z1 - z0, x1 - x0); g.add(m);
   }
+  for (const [x, z] of path) { const j = new T.Mesh(new T.CylinderGeometry(width / 2, width / 2, 0.4, 16), mat); j.position.set(x, y, z); g.add(j); }
   return g;
 }
 function update3d() {
@@ -1442,15 +1579,17 @@ function update3d() {
   v.chevrons = [];
   // highlight the current department in yellow
   const curId = stops[cur] && stops[cur].section.id;
-  for (const id in v.highlight) { const hl = v.highlight[id]; for (const p of hl.parts) p.material.color.setHex(id === curId ? 0xffd84a : hl.color); }
-  const hl = v.highlight[curId];
-  if (hl) { const r = hl.rect; v.glow.visible = true; v.glow.scale.set(r[2] + 16, r[3] + 16, 1); v.glow.position.set(r[0] + r[2] / 2, 0.3, r[1] + r[3] / 2); } else v.glow.visible = false;
+  for (const id in v.signs) { const sg = v.signs[id], isCur = id === curId;
+    if (sg.on) { sg.on.userData.base = isCur; sg.off.userData.base = !isCur; sg.on.visible = isCur; sg.off.visible = !isCur; }
+    else { const o = sg.off, k = isCur ? 1.4 : 1; if (!o.userData.s0) o.userData.s0 = [o.scale.x, o.scale.y]; o.scale.set(o.userData.s0[0] * k, o.userData.s0[1] * k, 1); } }
+  const sec = BYID[curId], r = sec ? (sec.aisle ? [70, AY(sec.aisle) - 8, 145, 16] : (sec.rect || sec.row)) : null;
+  if (r) { v.glow.visible = true; v.glow.scale.set(r[2] + 50, r[3] + 50, 1); v.glow.position.set(r[0] + r[2] / 2, 0.35, r[1] + r[3] / 2); } else v.glow.visible = false;
   // the whole route faintly, the walk to the current stop in bold red with moving arrows
   v.faint = null;
   if (lastRoute && lastRoute.length > 1) { v.faint = ribbon(T, lastRoute, 2.2, 0x7d948a, 0.35, 0.55); v.dyn.add(v.faint); }
   const L = lastLeg && lastLeg.length > 1 ? lastLeg : null;
   if (L) {
-    v.dyn.add(ribbon(T, L, 6, 0xd62839, 0.6));
+    v.dyn.add(ribbon(T, L, 8.5, 0xffffff, 0.5)); v.dyn.add(ribbon(T, L, 6, 0xe0313f, 0.75));
     const shape = new T.Shape(); shape.moveTo(0, 2.6); shape.lineTo(2.4, -1.6); shape.lineTo(0, -0.4); shape.lineTo(-2.4, -1.6); shape.lineTo(0, 2.6);
     const cg = new T.ShapeGeometry(shape), cm = new T.MeshBasicMaterial({ color: 0xffffff });
     let total = 0; const segs = [];
@@ -1479,11 +1618,19 @@ function update3d() {
   // you: where this walk starts
   const start = here ? here.stop : L ? L[0] : ENTRANCE;
   const you = new T.Group();
-  const dot = new T.Mesh(new T.SphereGeometry(4, 20, 14), new T.MeshLambertMaterial({ color: 0x2f7fe0, emissive: 0x0b2a55 }));
-  dot.position.y = 4.5;
+  const dot = new T.Group();   // a little shopper: body, head, cart handle direction
+  const shirt = new T.MeshLambertMaterial({ color: 0x2f7fe0 }), skin = new T.MeshLambertMaterial({ color: 0xf1c27d }), dark = new T.MeshLambertMaterial({ color: 0x263238 });
+  const legs = new T.Mesh(new T.CylinderGeometry(1.5, 1.3, 5, 12), dark); legs.position.y = 2.5;
+  const body = new T.Mesh(new T.CylinderGeometry(2.1, 1.7, 6, 14), shirt); body.position.y = 8;
+  const shoulders = new T.Mesh(new T.SphereGeometry(2.1, 14, 8), shirt); shoulders.position.y = 11; shoulders.scale.y = 0.55;
+  const head = new T.Mesh(new T.SphereGeometry(1.9, 16, 12), skin); head.position.y = 13.6;
+  const nose = new T.Mesh(new T.ConeGeometry(1.4, 3, 12), new T.MeshLambertMaterial({ color: 0x2f7fe0 })); nose.rotation.x = Math.PI / 2; nose.position.set(0, 0.6, 5.5);
+  dot.add(legs, body, shoulders, head, nose);
+  const L0 = L && L.length > 1 ? L : null;
+  if (L0) { let k = 1; while (k < L0.length - 1 && Math.hypot(L0[k][0] - start[0], L0[k][1] - start[1]) < 2) k++; dot.rotation.y = Math.atan2(L0[k][0] - start[0], L0[k][1] - start[1]); }
   const ring = new T.Mesh(new T.RingGeometry(6, 8, 32), new T.MeshBasicMaterial({ color: 0x2f7fe0, transparent: true, opacity: 0.5, side: T.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.7;
-  const yl = label(T, "אתה כאן", { size: 20, scale: 0.3, bg: "#2f7fe0", fg: "#fff", depthTest: false }); yl.position.y = 15;
+  const yl = label(T, "אתה כאן", { size: 20, scale: 0.3, bg: "#2f7fe0", fg: "#fff", depthTest: false }); yl.position.y = 21;
   you.add(dot, ring, yl); you.position.set(start[0], 0, start[1]); v.dyn.add(you); v.you = you; v.youRing = ring;
   aimCamera();
 }
@@ -1531,14 +1678,14 @@ function tick3d(force) {
   // at eye level you are the camera: hide your own marker and the signs right on top of you
   const eye = mapMode === "eye" && !v.overview;
   if (v.you) v.you.visible = !eye;
-  if (eye !== v.wasEye || eye) { const cp = v.camera.position; for (const sp of v.tags) sp.visible = !eye || Math.hypot(sp.position.x - cp.x, sp.position.z - cp.z) > 70; if (v.faint) v.faint.visible = !eye; v.wasEye = eye; }
+  { const cp = v.camera.position; for (const sp of v.tags) sp.visible = sp.userData.base !== false && (!eye || Math.hypot(sp.position.x - cp.x, sp.position.z - cp.z) > 70); if (v.faint) v.faint.visible = !eye; }
   if (v.youRing) { const k = still ? 1 : 1 + 0.25 * Math.sin(t * 4); v.youRing.scale.set(k, k, k); }
   if (v.legSegs && v.chevrons.length) {
     const n = v.chevrons.length, gap = v.legLen / n, off = still ? 0 : (t * 14) % gap;
     v.chevrons.forEach((m, k) => {
       let at = k * gap + off; const sg = v.legSegs.find(s => at >= s.at && at <= s.at + s.len) || v.legSegs[v.legSegs.length - 1];
       const f = sg.len ? (at - sg.at) / sg.len : 0, x = sg.a[0] + (sg.b[0] - sg.a[0]) * f, z = sg.a[1] + (sg.b[1] - sg.a[1]) * f;
-      m.position.set(x, 0.9, z); m.rotation.z = Math.atan2(-(sg.b[0] - sg.a[0]), -(sg.b[1] - sg.a[1]));
+      m.position.set(x, 1.05, z); m.rotation.z = Math.atan2(-(sg.b[0] - sg.a[0]), -(sg.b[1] - sg.a[1]));
     });
   }
   v.renderer.render(v.scene, v.camera);
