@@ -801,12 +801,12 @@ function drawMap() {
     if (on) m.appendChild(el("rect", { x: 70, y: y - 8, width: 145, height: 16, rx: 3, class: "zone on" }));
     m.appendChild(el("rect", { x: 70, y: y + 7, width: 57, height: 5, class: "shelf" }));
     m.appendChild(el("rect", { x: 143, y: y + 7, width: 72, height: 5, class: "shelf" }));
-    // both sides of the aisle, as seen when walking in from the entrance side (right): right side = upper shelf, left side = lower shelf
+    // the walkway runs up the middle (SPINE); each row has a left shelf block and a right shelf block, labeled with what is on it
     if (s.left) {
-      m.appendChild(el("text", { x: 218, y: y - 4, "text-anchor": "start", "dominant-baseline": "central", class: "aisletxt side" }, "ימין: " + s.right));
-      m.appendChild(el("text", { x: 218, y: y + 4, "text-anchor": "start", "dominant-baseline": "central", class: "aisletxt side" }, "שמאל: " + s.left));
+      m.appendChild(el("text", { x: 98, y, "text-anchor": "middle", "dominant-baseline": "central", class: "aisletxt side" }, s.left));
+      m.appendChild(el("text", { x: 179, y, "text-anchor": "middle", "dominant-baseline": "central", class: "aisletxt side" }, s.right));
     } else m.appendChild(el("text", { x: 220, y, "text-anchor": "start", "dominant-baseline": "central", class: "aisletxt" + (s.est ? " est" : "") }, s.short));
-    m.appendChild(el("text", { x: 100, y, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, String(i)));
+    m.appendChild(el("text", { x: s.left ? SPINE : 100, y, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, String(i)));
   }
   for (const s of SECTIONS) {
     const r = s.rect || s.row; if (!r) continue;
@@ -1910,9 +1910,9 @@ function build3d(T) {
   }
   for (let i = 1; i <= 14; i++) {
     const s = BYID["a" + i], y = AY(i);
-    const num = label(T, String(i), { bg: "#ffd200", fg: "#c4161c", border: "#c4161c", size: 30, scale: 0.34 }); num.position.set(100, 30, y); scene.add(num); tags.push(num);
-    const nm = label(T, s.left ? "ימין: " + s.right : s.short, { size: 19, scale: 0.26, fg: "#2b302d", bg: "rgba(255,255,255,0.92)" }); nm.position.set(178, 27, y - 5); scene.add(nm); tags.push(nm);
-    if (s.left) { const nl = label(T, "שמאל: " + s.left, { size: 19, scale: 0.26, fg: "#2b302d", bg: "rgba(255,255,255,0.92)" }); nl.position.set(178, 21, y + 5); scene.add(nl); tags.push(nl); }
+    const num = label(T, String(i), { bg: "#ffd200", fg: "#c4161c", border: "#c4161c", size: 30, scale: 0.34 }); num.position.set(SPINE, 32, y); scene.add(num); tags.push(num);
+    const nm = label(T, s.left ? s.right : s.short, { size: 19, scale: 0.27, fg: "#2b302d", bg: "rgba(255,255,255,0.92)" }); nm.position.set(s.left ? 179 : 182, 24, y); scene.add(nm); tags.push(nm);
+    if (s.left) { const nl = label(T, s.left, { size: 19, scale: 0.27, fg: "#2b302d", bg: "rgba(255,255,255,0.92)" }); nl.position.set(98, 24, y); scene.add(nl); tags.push(nl); }
     signs[s.id] = { off: nm, on: null };
   }
   const ent = label(T, "▲ כניסה", { bg: "rgba(46,125,91,0.95)", fg: "#fff" }); ent.position.set(300, 14, 682); scene.add(ent); tags.push(ent);
