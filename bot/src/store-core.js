@@ -78,7 +78,7 @@ for (const s of SECTIONS) {
 }
 
 let BYID = Object.fromEntries(SECTIONS.map(s => [s.id, s]));
-let ENTRANCE = [RIGHT, 690], CHECKOUT = [LEFT, 600];
+let ENTRANCE = [RIGHT, 690], CHECKOUT = [RIGHT, 626];
 const BACK_ORDER = 9; // sections with order <= this (after produce) are in the back area
 // ---------- Stores: the built-in Yochananof map, or a store generated from a mapping (walls + aisles) ----------
 let STORE = { title: "יוחננוף באר שבע", generated: false, slug: "", W: 360, H: 660 };

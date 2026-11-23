@@ -396,7 +396,7 @@ for (const s of SECTIONS) {
 }
 
 let BYID = Object.fromEntries(SECTIONS.map(s => [s.id, s]));
-let ENTRANCE = [RIGHT, 690], CHECKOUT = [LEFT, 600];
+let ENTRANCE = [RIGHT, 690], CHECKOUT = [RIGHT, 626];
 const BACK_ORDER = 9; // sections with order <= this (after produce) are in the back area
 // ---------- Stores: the built-in Yochananof map, or a store generated from a mapping (walls + aisles) ----------
 let STORE = { title: "יוחננוף באר שבע", generated: false, slug: "", W: 360, H: 660 };
@@ -651,7 +651,7 @@ function buildRoute() {
   const rank = sec => STORE.generated ? sec.order : sec.aisle ? (backUsed ? 10 + (15 - sec.aisle) : 10 + sec.aisle) : sec.id === "home" ? (backUsed ? 30 : 2.5) : sec.id === "beer" ? (backUsed ? 9 : 25) : sec.order;
   stops = Object.keys(groups).map(id => ({ section: BYID[id], items: groups[id] })).sort((a, b) => rank(a.section) - rank(b.section));
   stops = orderStops(ENTRANCE, stops, CHECKOUT, false);
-  stops.push({ section: { id: "checkout", where: STORE.generated ? `הקופות, ${STORE.g.coL ? "בצד שמאל" : "בצד ימין"} ליד הכניסה` : "קופות השירות העצמי, ואחריהן הקופה הראשית והיציאה עם העגלות, בצד שמאל של החנות", stop: CHECKOUT, num: "✓" }, items: [], end: true });
+  stops.push({ section: { id: "checkout", where: STORE.generated ? `הקופות, ${STORE.g.coL ? "בצד שמאל" : "בצד ימין"} ליד הכניסה` : "הקופה הראשית, ליד הכניסה בצד ימין (קופות השירות העצמי והיציאה עם העגלות בצד שמאל של החנות)", stop: CHECKOUT, num: "✓" }, items: [], end: true });
   cur = 0; renderNav(); drawMap(); updateShare();
 }
 
@@ -661,13 +661,13 @@ function turnText(i) {
   const s = stops[i].section;
   if (here && i === cur) {
     if (here.id === s.id) return "אתה כבר כאן";
-    if (s.end) return "המשך לקופות בצד שמאל של החנות";
+    if (s.end) return "חזור לכיוון הכניסה, הקופה הראשית מימין לה";
     if (s.aisle) return here.aisle ? (Math.abs(s.aisle - here.aisle) === 1 ? "עבור למעבר הסמוך" : `חזור למעבר הראשי והמשך עד מעבר ${s.aisle}`) : `המשך עד מעבר ${s.aisle}`;
     return "מכאן המשך";
   }
   const prev = i === 0 ? null : stops[i - 1].section;
   if (i === 0) return "מהכניסה, עבור את מבואת המבצעים והמשך ישר";
-  if (s.end) return prev.id === "drinks" ? "המשך ישר, הקופות מימינך" : "המשך לקופות בצד שמאל של החנות";
+  if (s.end) return "חזור לכיוון הכניסה, הקופה הראשית מימין לה";
   if (s.id === "drinks") return ["fish","ffish","meat","chicken","frozen"].includes(prev.id) ? "עם הגב לקצביות, עבור את המקפיא השטוח, והשתייה מימינך" : "פנה לקיר השמאלי של החנות";
   const back = x => x.stop[1] <= BACK + 1 || x.id === "nuts";
   const fixed = { nuts: "המשך ישר כמעט עד הסוף ופנה שמאלה", dairy: prev.id === "nuts" ? "פנה ימינה" : "המשך לפינה הימנית האחורית",
@@ -763,8 +763,10 @@ function drawMap() {
   if (STORE.generated) drawGeneric(m, curId); else {
   m.appendChild(el("rect", { x: 10, y: 10, width: 340, height: 650, class: "wall", rx: 4 }));
   // promo foyer + entrance
-  m.appendChild(el("rect", { x: 230, y: 596, width: 115, height: 60, rx: 4, class: "zone promo" }));
-  m.appendChild(el("text", { x: 287, y: 626, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, "מבואת מבצעים"));
+  m.appendChild(el("rect", { x: 230, y: 596, width: 62, height: 60, rx: 4, class: "zone promo" }));
+  m.appendChild(el("text", { x: 261, y: 626, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, "מבצעים"));
+  m.appendChild(el("rect", { x: 300, y: 596, width: 45, height: 60, rx: 4, class: "zone" + (curId === "checkout" ? " on" : "") }));
+  m.appendChild(el("text", { x: 322, y: 626, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, "🛒 קופה ראשית"));
   m.appendChild(el("text", { x: 300, y: 682, "text-anchor": "middle", class: "lbl" }, "▲ כניסה"));
   // aisle rows: shelves between rows, number on the main walkway, name on the left half
   for (let i = 1; i <= 14; i++) {
@@ -785,8 +787,8 @@ function drawMap() {
     m.appendChild(el("text", { x: x + w / 2, y: y + h / 2, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl",
       transform: vertical ? `rotate(90 ${x + w / 2} ${y + h / 2})` : "" }, s.short));
   }
-  for (const [y, h, t] of [[522, 50, "שירות עצמי"], [576, 78, "קופות"]]) {
-    m.appendChild(el("rect", { x: 14, y, width: 30, height: h, rx: 4, class: "zone" + (curId === "checkout" ? " on" : "") }));
+  for (const [y, h, t] of [[522, 50, "שירות עצמי"], [576, 78, "יציאה עם עגלות"]]) {
+    m.appendChild(el("rect", { x: 14, y, width: 30, height: h, rx: 4, class: "zone" }));
     m.appendChild(el("text", { x: 29, y: y + h / 2, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl", transform: `rotate(90 29 ${y + h / 2})` }, t));
   }
   }
@@ -1724,8 +1726,8 @@ function build3d(T) {
   const SW = STORE.W, SH = STORE.H, ex = ENTRANCE[0];
   const wallList = STORE.generated ? [[6, 6, SW - 12, 4], [6, SH - 4, ex - 36, 4], [ex + 30, SH - 4, SW - 36 - ex, 4], [6, 6, 4, SH - 6], [SW - 10, 6, 4, SH - 6]] : [[6, 6, 348, 4], [6, 656, 214, 4], [6, 6, 4, 654], [350, 6, 4, 654]];
   for (const [x, z, w, d] of wallList) { box(x, z, w, d, 26, wall); box(x - 0.3, z - 0.3, w + 0.6, d + 0.6, 4, band, 22); }
-  if (!STORE.generated) box(230, 596, 115, 60, 0.6, 0xe8dcc2);       // promo foyer mat
-  if (!STORE.generated) for (const [x, z] of [[246, 610], [276, 626], [310, 608]]) { box(x, z, 18, 14, 9, 0xd84a3a); box(x + 1, z + 1, 16, 12, 2, 0xffc94a, 9); }  // promo bins
+  if (!STORE.generated) box(230, 596, 62, 60, 0.6, 0xe8dcc2);       // promo foyer mat
+  if (!STORE.generated) for (const [x, z] of [[240, 606], [264, 630]]) { box(x, z, 18, 14, 9, 0xd84a3a); box(x + 1, z + 1, 16, 12, 2, 0xffc94a, 9); }  // promo bins
   // product instances, gathered and drawn in a few batches
   const P = { solid: solids, box: [], bottle: [], ball: [] };
   const put = (kind, x, y, z, sx, sy, sz, color, ry = 0) => P[kind].push({ x, y, z, sx, sy, sz, color, ry });
@@ -1856,7 +1858,7 @@ function build3d(T) {
   { const r = B.beer.row; gondola(r[0], r[1], r[2], 4, 14, 4, PAL.beer, "bottle", 1); gondola(r[0], r[1] + r[3] - 4, r[2], 4, 14, 4, PAL.beer, "bottle", 1); }
   for (let i = 1; i <= 14; i++) { const y = AY(i); gondola(70, y + 6, 57, 6, 15, 4, AISLE_PAL[i - 1]); gondola(143, y + 6, 72, 6, 15, 4, AISLE_PAL[i - 1]); }
   // checkouts: counters with a dark belt and a small screen
-  for (let k = 0; k < 4; k++) { const z = 528 + k * 31; box(14, z, 26, 8, 8, 0xdfe3e1); box(15, z + 1.5, 24, 5, 0.6, 0x2b2f2e, 8); box(34, z + 1, 1, 4, 6, 0x37474f, 8.6); }
+  for (let k = 0; k < 2; k++) { const z = 530 + k * 22; box(14, z, 26, 8, 8, 0xdfe3e1); box(15, z + 1.5, 24, 5, 0.6, 0x2b2f2e, 8); box(34, z + 1, 1, 4, 6, 0x37474f, 8.6); }
   }
   // product batches
   const geo = { solid: new T.BoxGeometry(1, 1, 1), box: new T.BoxGeometry(1, 1, 1), bottle: new T.CylinderGeometry(0.42, 0.5, 1, 6, 1), ball: new T.IcosahedronGeometry(0.55, 0) };
@@ -1882,7 +1884,9 @@ function build3d(T) {
     signs[s.id] = { off: nm, on: null };
   }
   const ent = label(T, "▲ כניסה", { bg: "rgba(46,125,91,0.95)", fg: "#fff" }); ent.position.set(300, 14, 682); scene.add(ent); tags.push(ent);
-  const co = signboard(T, "🛒", "קופות", "#455a64", false); co.position.set(28, 30, 590); scene.add(co); tags.push(co);
+  for (let k = 0; k < 3; k++) { const z = 602 + k * 18; box(314, z, 26, 8, 8, 0xdfe3e1); box(315, z + 1.5, 24, 5, 0.6, 0x2b2f2e, 8); box(334, z + 1, 1, 4, 6, 0x37474f, 8.6); }
+  const co = signboard(T, "🛒", "קופה ראשית", "#455a64", false); co.position.set(326, 30, 626); scene.add(co); tags.push(co);
+  const sc = label(T, "שירות עצמי · יציאה", { size: 18, scale: 0.3 }); sc.position.set(28, 24, 560); scene.add(sc); tags.push(sc);
   }
   // dynamic layer: route, stops, you
   const dyn = new T.Group(); scene.add(dyn);

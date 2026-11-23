@@ -2,7 +2,7 @@
 import { DIST } from "./distances.js";
 import { SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK, BACK_ORDER, clean, matchSection, leg, startsKw, splitList, whereFromWords } from "./store-core.js";
 
-export const END = { id: "checkout", where: "קופות השירות העצמי, ואחריהן הקופה הראשית והיציאה עם העגלות, בצד שמאל של החנות", stop: CHECKOUT, num: "✓" };
+export const END = { id: "checkout", where: "הקופה הראשית, ליד הכניסה בצד ימין (קופות השירות העצמי והיציאה עם העגלות בצד שמאל של החנות)", stop: CHECKOUT, num: "✓" };
 
 // walking distance between two map points, memoized (the free plan has a tight CPU budget)
 const distMemo = new Map();
@@ -65,12 +65,12 @@ const isBack = x => x.stop[1] <= BACK + 1 || x.id === "nuts";
 export function turnText(s, prev, here) {
   if (here) {
     if (here.id === s.id) return "אתה כבר כאן";
-    if (s.id === "checkout") return "המשך לקופות בצד שמאל של החנות";
+    if (s.id === "checkout") return "חזור לכיוון הכניסה, הקופה הראשית מימין לה";
     if (s.aisle) return here.aisle ? (Math.abs(s.aisle - here.aisle) === 1 ? "עבור למעבר הסמוך" : `חזור למעבר הראשי והמשך עד מעבר ${s.aisle}`) : `המשך עד מעבר ${s.aisle}`;
     return "מכאן המשך";
   }
   if (!prev) return "מהכניסה, עבור את מבואת המבצעים והמשך ישר";
-  if (s.id === "checkout") return prev.id === "drinks" ? "המשך ישר, הקופות מימינך" : "המשך לקופות בצד שמאל של החנות";
+  if (s.id === "checkout") return "חזור לכיוון הכניסה, הקופה הראשית מימין לה";
   if (s.id === "drinks") return ["fish", "ffish", "meat", "chicken", "frozen"].includes(prev.id) ? "עם הגב לקצביות, עבור את המקפיא השטוח, והשתייה מימינך" : "פנה לקיר השמאלי של החנות";
   const fixed = { nuts: "המשך ישר כמעט עד הסוף ופנה שמאלה", dairy: prev.id === "nuts" ? "פנה ימינה" : "המשך לפינה הימנית האחורית",
     ddeli: "הסתובב", bakery: "פנה שמאלה", meat: "המשך ישר", frozen: "הסתובב" };
