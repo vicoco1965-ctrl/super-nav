@@ -121,7 +121,7 @@ body.navmode .nav{position:fixed;inset:0;z-index:20;background:var(--bg);padding
 .drawer summary::-webkit-details-marker{display:none}
 .drawer[open]{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
 .drawer[open] summary{padding-inline:0}
-.steps{margin:0;padding:0 22px 0 0;display:flex;flex-direction:column;gap:2px}
+.steps{margin:0;padding:0 4px 0 0;list-style:none;display:flex;flex-direction:column;gap:2px}
 .steps li{padding:6px 4px;border-radius:8px;cursor:pointer}
 .steps li.done{color:var(--muted);text-decoration:line-through}
 .steps li.cur{background:var(--tag);color:var(--tag-fg);font-weight:700}
@@ -739,7 +739,7 @@ function stopText(i) {
 }
 function routeText() {
   const lines = [`🛒 המסלול שלי בסופר (${STORE.title}):`];
-  stops.forEach((s, i) => { if (!s.end) lines.push(`${i + 1}. ${s.section.where}: ${s.items.join(", ")}`); });
+  stops.forEach((s, i) => { if (!s.end) lines.push(`• ${s.section.where}: ${s.items.join(", ")}`); });
   lines.push("✓ ואז לקופות");
   return lines.join("\n");
 }
@@ -750,7 +750,7 @@ function renderNav() {
   $("tagWhere").textContent = t.where;
   $("tagTurn").textContent = t.turn;
   $("tagTake").textContent = t.take;
-  $("progress").textContent = s.end ? `${total} מתוך ${total} תחנות` : `תחנה ${cur + 1} מתוך ${total}`;
+  $("progress").textContent = s.end ? "סוף הרשימה" : "";
   $("prevBtn").disabled = cur === 0;
   $("nextBtn").disabled = cur >= stops.length - 1;
   const atEnd = !!(stops[cur] && stops[cur].end) && stops.length > 1;
@@ -863,7 +863,7 @@ function drawMap() {
   stops.forEach((s, i) => {
     const [x, y] = s.section.stop;
     m.appendChild(el("circle", { cx: x, cy: y, class: "stop" + (i < cur ? " done" : i === cur ? " cur" : " later"), r: i === cur ? 11 : 8 }));
-    m.appendChild(el("text", { x, y, class: "stopn" + (i === cur ? " cur" : "") }, s.end ? "✓" : String(i + 1)));
+    if (s.end) m.appendChild(el("text", { x, y, class: "stopn" + (i === cur ? " cur" : "") }, "✓"));
   });
   if (here) {
     const [x, y] = here.stop;
@@ -1640,7 +1640,7 @@ async function runPlan(plan, text) {
           const already = stops.findIndex((s, i) => i >= cur && !s.end && s.section.id === sec.id);
           if (already === cur) notes.push(`יש ${name} ${inPlace(sec.where)}, זו התחנה שאתה הולך אליה עכשיו`);
           else { placeItem(name, sec, true); notes.push(`יש ${name} ${inPlace(sec.where)}. זו התחנה הבאה שלך. ${stopText(cur).turn}`); }
-        } else { const n = placeItem(name, sec, false); notes.push(`הוספתי ${name}, ${inPlace(sec.where)}, ` + (n === cur ? "בתחנה שאתה הולך אליה עכשיו" : `תחנה ${n + 1}`)); }
+        } else { const n = placeItem(name, sec, false); notes.push(`הוספתי ${name}, ${inPlace(sec.where)}, ` + (n === cur ? "בתחנה שאתה הולך אליה עכשיו" : "למסלול")); }
         moved = true;
       }
     } else if (a.type === "remove") {
@@ -2024,7 +2024,7 @@ function update3d() {
     const [x, z] = s.section.stop, isCur = i === cur, done = i < cur;
     const disc = new T.Mesh(new T.CylinderGeometry(isCur ? 6 : 4.5, isCur ? 6 : 4.5, 1, 24), new T.MeshLambertMaterial({ color: done ? 0x9fb3aa : isCur ? 0xd62839 : 0xffffff }));
     disc.position.set(x, 0.8, z); v.dyn.add(disc);
-    if (!isCur) { const t = label(T, s.end ? "✓" : String(i + 1), { size: 22, scale: 0.3, bg: done ? "rgba(159,179,170,0.95)" : "rgba(255,255,255,0.95)", border: done ? null : "#0f6b52" }); t.position.set(x, 9, z); v.dyn.add(t); }
+    if (!isCur && s.end) { const t = label(T, "✓", { size: 22, scale: 0.3, bg: done ? "rgba(159,179,170,0.95)" : "rgba(255,255,255,0.95)", border: done ? null : "#0f6b52" }); t.position.set(x, 9, z); v.dyn.add(t); }
   });
   // big red pin over the current stop
   const cs = stops[cur];
@@ -2033,7 +2033,7 @@ function update3d() {
     const head = new T.Mesh(new T.SphereGeometry(5.5, 20, 14), new T.MeshLambertMaterial({ color: 0xd62839 }));
     const cone = new T.Mesh(new T.ConeGeometry(4.2, 11, 20), new T.MeshLambertMaterial({ color: 0xd62839 }));
     cone.rotation.x = Math.PI; cone.position.y = -6.5; pin.add(head, cone);
-    const num = label(T, cs.end ? "✓" : String(cur + 1), { size: 26, scale: 0.32, bg: "#d62839", fg: "#fff", depthTest: false }); num.position.y = 12; pin.add(num);
+    if (cs.end) { const num = label(T, "✓", { size: 26, scale: 0.32, bg: "#d62839", fg: "#fff", depthTest: false }); num.position.y = 12; pin.add(num); }
     pin.position.set(cs.section.stop[0], 20, cs.section.stop[1]); v.dyn.add(pin); v.pin = pin;
   }
   // you: where this walk starts
