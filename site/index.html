@@ -348,10 +348,10 @@ let SECTIONS = [
   {id:"ffish", name:"מקרר דגים קפואים", short:"דגים קפואים", where:"מקרר הדגים הקפואים, ממול דלפק הדגים הטריים", num:"🧊", order:7,
    rect:[15,58,40,10], stop:[32,BACK],
    kw:["דגים קפואים","דג קפוא","פילה קפוא","שרימפס","קלמרי","פירות ים","פילה אמנון קפוא","סלמון קפוא","מוסר ים קפוא"]},
-  {id:"meat", name:"קצביית בשר", short:"קצביית בשר", where:"קצביית הבשר, בקיר האחורי", num:"🥩", order:7,
+  {id:"meat", name:"קצביית בשר", short:"בשר", where:"קצביית הבשר, בקיר האחורי", num:"🥩", order:7,
    rect:[52,14,36,24], stop:[70,BACK],
    kw:["בשר","טחון","בשר טחון","סטייק","אנטריקוט","צלעות","כבד","קבב","המבורגר","אסאדו","שריר","כתף"]},
-  {id:"chicken", name:"קצביית עוף", short:"קצביית עוף", where:"קצביית העוף, בקיר האחורי ליד המאפייה", num:"🍗", order:7,
+  {id:"chicken", name:"קצביית עוף", short:"עוף", where:"קצביית העוף, בקיר האחורי ליד המאפייה", num:"🍗", order:7,
    rect:[91,14,34,24], stop:[108,BACK],
    kw:["עוף","חזה","חזה עוף","כרעיים","כרעי עוף","כנפיים","פרגית","שניצל","הודו","שוקיים","עוף שלם"]},
   {id:"frozen", name:"קפואים, בצקים ומקררי נקניק ובשר", short:"קפואים ובצקים", where:"גוש המקררים במרכז האזור האחורי, ממול הקצביות: קפואים, בצקים, נקניקים ובשר ארוז", num:"❄", order:8,
@@ -784,6 +784,8 @@ function leg(a, b) {
   return [a, ...path, b];
 }
 const pts = p => p.map(q => q.join(",")).join(" ");
+// font size that fits a label into the space it has (map units)
+const fitFs = (txt, avail) => Math.max(4.5, Math.min(11, avail / (String(txt).length * 0.6)));
 function drawMap() {
   const m = $("map"); m.textContent = "";
   const curId = stops[cur] && stops[cur].section.id;
@@ -793,7 +795,7 @@ function drawMap() {
   m.appendChild(el("rect", { x: 230, y: 596, width: 62, height: 60, rx: 4, class: "zone promo" }));
   m.appendChild(el("text", { x: 261, y: 626, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, "מבצעים"));
   m.appendChild(el("rect", { x: 300, y: 596, width: 45, height: 60, rx: 4, class: "zone" + (curId === "checkout" ? " on" : "") }));
-  m.appendChild(el("text", { x: 322, y: 626, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, "🛒 קופה ראשית"));
+  m.appendChild(el("text", { x: 322, y: 626, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl", style: "font-size:5.6px" }, "🛒 קופה ראשית"));
   m.appendChild(el("text", { x: 300, y: 682, "text-anchor": "middle", class: "lbl" }, "▲ כניסה"));
   // aisle rows: shelves between rows, number on the main walkway, name on the left half
   for (let i = 1; i <= 14; i++) {
@@ -816,11 +818,11 @@ function drawMap() {
     if (s.id === "frozen") { m.appendChild(el("text", { x: 98, y: 92, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, s.short)); continue; }
     const vertical = h > w * 1.5;
     m.appendChild(el("text", { x: x + w / 2, y: y + h / 2, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl",
-      transform: vertical ? `rotate(90 ${x + w / 2} ${y + h / 2})` : "" }, s.short));
+      style: `font-size:${fitFs(s.short, (vertical ? h : w) - 4).toFixed(1)}px`, transform: vertical ? `rotate(90 ${x + w / 2} ${y + h / 2})` : "" }, s.short));
   }
   for (const [y, h, t] of [[522, 50, "שירות עצמי"], [576, 78, "יציאה עם עגלות"]]) {
     m.appendChild(el("rect", { x: 14, y, width: 30, height: h, rx: 4, class: "zone" }));
-    m.appendChild(el("text", { x: 29, y: y + h / 2, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl", transform: `rotate(90 29 ${y + h / 2})` }, t));
+    m.appendChild(el("text", { x: 29, y: y + h / 2, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl", style: `font-size:${fitFs(t, h - 6).toFixed(1)}px`, transform: `rotate(90 29 ${y + h / 2})` }, t));
   }
   }
   // route
