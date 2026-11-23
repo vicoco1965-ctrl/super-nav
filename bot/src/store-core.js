@@ -1,21 +1,27 @@
 // GENERATED from site/index.html by bot/scripts/extract-store.mjs. Do not edit by hand.
-const SPINE = 135, RIGHT = 288, CONNECT = 458, BACK = 48, LEFT = 56;
+const SPINE = 135, RIGHT = 309, CONNECT = 458, BACK = 48, LEFT = 56;
 const AY = i => 180 + (14 - i) * 20;              // row center of aisle i (1 = nearest the produce)
 let SECTIONS = [
   {id:"produce", name:"פירות וירקות", short:"פירות וירקות", where:"מחלקת הפירות והירקות, ישר אחרי מבואת המבצעים", num:"🍅", order:1,
    rect:[230,482,115,108], stop:[RIGHT,540],
    kw:["עגבני","מלפפון","תפוח","בננ","בצל","שום","תפוחי אדמה","תפו\"א","גזר","לימון","פירות","ירקות","אבוקדו","פלפל","גמב","תפוז","ענבים","אבטיח","מלון","כרוב","קישוא","חציל","פטריות","תות","אגס","קלמנטינ","בטטה","פלפל חריף","צנון","סלק","קולרבי","דלעת","אפרסק","שזיף","מנגו","קיווי"]},
-  {id:"greens", name:"מקרר עלים ירוקים", short:"עלים", where:"מקרר העלים הגדול, בקיר שממולך ובצד ימין", num:"🌿", order:2,
-   rect:[230,446,115,26], stop:[RIGHT,470],
+  {id:"greens", name:"מקרר עלים ירוקים", short:"עלים", where:"מקרר העלים, צמוד לקיר הימני מיד אחרי הפירות והירקות", num:"🌿", order:2,
+   rect:[321,440,24,38], stop:[RIGHT,459],
    kw:["כוסברה","פטרוזיליה","שמיר","נענע","חסה","בזיליקום","עלים","בצל ירוק","תרד","רוקט","עירית","סלרי","מנגולד"]},
   {id:"home", name:"כלי בית", short:"כלי בית", where:"מחלקת כלי הבית, על הקיר הימני מיד אחרי מקרר העלים", num:"🍳", order:4,
-   rect:[321,374,24,62], stop:[RIGHT,405],
+   rect:[321,374,24,62], more:[[262,400,38,9]], stop:[RIGHT,405],
    kw:["סיר","מחבת","כלי בית","סכו\"ם","סכום","קומקום","קרש חיתוך","סכין","מגבת","קופסאות אחסון","כוס זכוכית"]},
   {id:"crackers", name:"פריכיות ורטבים", short:"פריכיות ורטבים", where:"קיר הפריכיות והרטבים, על הקיר הימני אחרי כלי הבית", num:"🥫", order:3,
    rect:[321,294,24,72], stop:[RIGHT,330],
-   kw:["פריכיות","פריכית","פריכיות אורז","פריכיות תירס","רוטב","רטבים","רוטב סויה","קטשופ","מיונז","חרדל","רוטב ברביקיו","רוטב צ'ילי","צ'ילי מתוק","רוטב שום","ויניגרט","רוטב לסלט","רוטב טריאקי"]},
-  {id:"nuts", name:"פיצוחים", short:"פיצוחים", where:"מחלקת הפיצוחים, בצד ימין", num:"🥜", order:3,
-   rect:[300,128,45,30], stop:[RIGHT,143],
+   kw:["פריכיות","פריכית","פריכיות אורז","פריכיות תירס","רוטב","רטבים","רוטב סויה","חרדל","רוטב ברביקיו","רוטב צ'ילי","צ'ילי מתוק","רוטב שום","ויניגרט","רוטב לסלט","רוטב טריאקי"]},
+  {id:"ketchup", name:"קטשופים", short:"קטשופים", where:"המדף הראשון במידוף שמול כלי הבית: קטשופים", num:"🍅", order:3,
+   rect:[262,382,38,9], stop:[RIGHT,386],
+   kw:["קטשופ","קטשופים","קטצ'ופ"]},
+  {id:"mayo", name:"מיונז", short:"מיונז", where:"המדף השלישי במידוף שמול כלי הבית: מיונז", num:"🥚", order:3,
+   rect:[262,418,38,9], stop:[RIGHT,422],
+   kw:["מיונז","מיונז לייט","איולי"]},
+  {id:"nuts", name:"פיצוחים", short:"פיצוחים", where:"מחלקת הפיצוחים, צמודה לקיר הימני", num:"🥜", order:3,
+   rect:[321,126,24,74], stop:[RIGHT,163],
    kw:["פיצוחים","גרעינים","בוטנים","שקדים","אגוז","קשיו","פיסטוק","פקאן","פירות יבשים","צימוקים","תמרים","מיקס"]},
   {id:"dairy", name:"חלב, גבינות, ביצים וסלטים", short:"מקררי חלב", where:"מקררי החלב, צמודים לקיר מימינך ומולך", num:"🥛", order:4,
    rect:[222,14,123,24], side:[321,38,24,84], stop:[310,BACK],
@@ -38,9 +44,12 @@ let SECTIONS = [
   {id:"chicken", name:"קצביית עוף", short:"עוף", where:"קצביית העוף, בקיר האחורי ליד המאפייה", num:"🍗", order:7,
    rect:[91,14,34,24], stop:[108,BACK],
    kw:["עוף","חזה","חזה עוף","כרעיים","כרעי עוף","כנפיים","פרגית","שניצל","הודו","שוקיים","עוף שלם"]},
-  {id:"frozen", name:"קפואים, בצקים ומקררי נקניק ובשר", short:"קפואים ובצקים", where:"גוש המקררים במרכז האזור האחורי, ממול הקצביות: קפואים, בצקים, נקניקים ובשר ארוז", num:"❄", order:8,
+  {id:"sausage", name:"מקררי נקניקיות ונקניקים", short:"נקניקיות", where:"מקררי הנקניקיות, ממול מקררי הקפואים ומימין להם", num:"🌭", order:8,
+   rect:[148,58,8,74], more:[[164,58,8,74]], stop:[SPINE,95],
+   kw:["נקניק","נקניקיות","נקניקייה","פסטרמה","סלמי","הודו פרוס","קבנוס","מרגז","צ'וריסו"]},
+  {id:"frozen", name:"קפואים ובצקים", short:"קפואים ובצקים", where:"מקררי הקפואים והבצקים, ארבעה מקררים לאורך במרכז האזור האחורי", num:"❄", order:8,
    rect:[68,58,8,74], more:[[84,58,8,74],[100,58,8,74],[116,58,8,74]], stop:[105,BACK],
-   kw:["גלידה","קפוא","קפואה","קפואים","פיצה","בצק עלים","בורקס","ארטיק","קרטיב","מלאווח","ג'חנון","ירקות קפואים","בשר קפוא","שניצל קפוא","בצק","בצקים","בצק פילו","נקניק","נקניקיות","פסטרמה","סלמי","הודו פרוס","בשר ארוז"]},
+   kw:["גלידה","קפוא","קפואה","קפואים","פיצה","בצק עלים","בורקס","ארטיק","קרטיב","מלאווח","ג'חנון","ירקות קפואים","בשר קפוא","שניצל קפוא","בצק","בצקים","בצק פילו","בשר ארוז"]},
   {id:"drinks", name:"שתייה", short:"שתייה", where:"מחלקת השתייה, בקיר השמאלי של החנות", num:"🥤", order:31,
    rect:[14,108,30,150], stop:[LEFT,184],
    kw:["מים","קולה","קוקה","מיץ","סודה","ספרייט","פאנטה","תפוזינה","פטל","משקה","שתייה","שתיה","נביעות","מי עדן","ספרינג","פריגת","פיוז טי","אייס טי","משקה אנרגיה","רד בול","סיידר"]},
@@ -85,10 +94,13 @@ let SECTIONS = [
    kwR:["אוכל לחתול","אוכל לכלב","חול לחתול","חטיף לכלב","בעלי חיים"]},
   {id:"a14", aisle:14, name:"מעבר 14: משמאל יין ואלכוהול, מימין נייר טואלט", short:"יין ונייר", num:"14", order:24, left:"יין ואלכוהול", right:"נייר טואלט",
    kwL:["יין","וודקה","ויסקי","ערק","אלכוהול","ליקר","ג'ין","רום","שמפניה","מיץ ענבים"],
-   kwR:["נייר טואלט","מגבות נייר","נייר סופג","טישו","ממחטות"]},
-  {id:"beer", name:"בירות", short:"בירות", where:"מדפי הבירות, מיד אחרי מעבר 14", num:"🍺", order:25,
-   row:[70,153,145,16], stop:[SPINE,161],
+   kwR:["נייר טואלט","טישו","ממחטות"]},
+  {id:"beer", name:"בירות", short:"בירות", where:"מדף הבירות, משמאל למעבר אחרי מעבר 14", num:"🍺", order:25,
+   row:[70,153,57,16], stop:[SPINE,161],
    kw:["בירה","בירות","קורונה","גולדסטאר","היינקן","מאלט"]},
+  {id:"paper", name:"נייר סופג", short:"נייר סופג", where:"מדף הנייר הסופג, מימין למעבר אחרי מעבר 14", num:"🧻", order:25,
+   row:[143,153,72,16], stop:[SPINE,161],
+   kw:["נייר סופג","מגבות נייר","מגבת נייר","נייר מטבח"]},
 ];
 for (const s of SECTIONS) {
   if (s.aisle) { s.kw = s.kw || [...s.kwL, ...s.kwR]; s.stop = [SPINE, AY(s.aisle)]; s.where = s.name.replace(":", ","); }
@@ -263,7 +275,8 @@ function genericTurn(i) {
   const turns = [];
   for (let k = 1; k < dirs.length; k++) { const c = dirs[k - 1][0] * dirs[k][1] - dirs[k - 1][1] * dirs[k][0]; if (c) turns.push(c > 0 ? "ימינה" : "שמאלה"); }
   const lead = i === 0 ? "מהכניסה, " : "";
-  if (s.end) return lead + (turns.length ? `פנה ${turns[0]} והמשך לקופות` : "המשך ישר לקופות");
+  const co = STORE.generated ? "לקופות" : "לקופות בקיר השמאלי";
+  if (s.end) return lead + (turns.length ? `פנה ${turns[0]} והמשך ${co}` : `המשך ישר ${co}`);
   if (!turns.length) return lead + "המשך ישר";
   const t = turns.length === 1 ? `פנה ${turns[0]}` : turns[0] === turns[1] ? `פנה ${turns[0]} ושוב ${turns[1]}` : `פנה ${turns[0]} ואז ${turns[1]}`;
   return lead + t + (s.aisle ? ` למעבר ${s.aisle}` : "");
@@ -306,9 +319,10 @@ function matchSection(item) {
 }
 
 // corridors the customer walks: right walkway, main walkway, back corridor, connector between them
-let CORR = [[[RIGHT, BACK], [RIGHT, 700]], [[SPINE, BACK], [SPINE, 640]], [[LEFT, BACK], [LEFT, 640]], [[LEFT, BACK], [330, BACK]], [[SPINE, CONNECT], [RIGHT, CONNECT]], [[LEFT, 640], [SPINE, 640]],
-  // every aisle row (and the beer row) is open end to end, so the route can cut across between the walls
-  [[LEFT, 161], [RIGHT, 161]], ...Array.from({ length: 14 }, (_, k) => [[LEFT, AY(k + 1)], [RIGHT, AY(k + 1)]])];
+let CORR = [[[RIGHT, BACK], [RIGHT, 700]], [[SPINE, BACK], [SPINE, 640]], [[LEFT, BACK], [LEFT, 640]], [[LEFT, BACK], [330, BACK]], [[LEFT, CONNECT], [RIGHT, CONNECT]],
+  // the aisles are reached from the middle walkway (SPINE), so "left" and "right" in the aisle are as seen walking in from the entrance;
+  // the gap between the beers and the paper towels is the only other cross walkway
+  [[LEFT, 161], [RIGHT, 161]]];
 function proj(p) {
   let best = null;
   for (const [a, b] of CORR) {
@@ -402,11 +416,25 @@ function sideOf(sec, item) {
   for (const [k, list] of [["L", sec.kwL], ["R", sec.kwR]]) for (const w of list) if (c.includes(w) && w.length > len) { side = k; len = w.length; }
   return side;
 }
-function sidedList(sec, names) {
+// the sides are written as seen walking up the middle walkway from the entrance; walking back toward the entrance they swap
+function sidedList(sec, names, flip = false) {
   if (!sec.aisle || !sec.kwL || sec.left === sec.right) return names.join(", ");
   const L = [], R = [], U = [];
   for (const n of names) (sideOf(sec, n) === "L" ? L : sideOf(sec, n) === "R" ? R : U).push(n);
-  return [L.length && "משמאל " + L.join(", "), R.length && "מימין " + R.join(", "), U.length && U.join(", ")].filter(Boolean).join(". ");
+  const [l, r] = flip ? ["מימין", "משמאל"] : ["משמאל", "מימין"];
+  return [L.length && l + " " + L.join(", "), R.length && r + " " + R.join(", "), U.length && U.join(", ")].filter(Boolean).join(". ");
+}
+// true when the route reaches this aisle walking toward the entrance (down the middle walkway)
+function walkingOut(i) {
+  const s = stops[i].section; if (!s.aisle || STORE.generated) return false;
+  const from = here && i === cur ? here.stop : i === 0 ? ENTRANCE : stops[i - 1].section.stop;
+  const p = leg(from, s.stop);
+  for (let k = p.length - 1; k > 0; k--) { const dy = p[k][1] - p[k - 1][1]; if (Math.abs(dy) > 0.5 && Math.abs(p[k][0] - p[k - 1][0]) < 0.5) return dy > 0; }
+  return false;
+}
+function aisleWhere(sec, flip) {
+  if (!sec.left || sec.left === sec.right) return sec.where;
+  return flip ? `מעבר ${sec.aisle}, מימינך ${sec.left}, משמאלך ${sec.right}` : `מעבר ${sec.aisle}, משמאלך ${sec.left}, מימינך ${sec.right}`;
 }
 
-export { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList };
+export { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList, aisleWhere };

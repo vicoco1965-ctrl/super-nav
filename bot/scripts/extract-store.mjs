@@ -21,7 +21,7 @@ export function buildCore(html) {
   ];
   return `// GENERATED from site/index.html by bot/scripts/extract-store.mjs. Do not edit by hand.\n` +
     parts.join("\n\n") +
-    `\n\nexport { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList };\n`;
+    `\n\nexport { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList, aisleWhere };\n`;
 }
 // Walking distances between every pair of stops, worked out ahead of time: the Worker's free plan
 // allows only a few milliseconds of CPU per message, too little to run the path search each time.

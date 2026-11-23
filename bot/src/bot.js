@@ -1,6 +1,6 @@
 // The conversation: state + one customer message -> new state + replies. No network here, so it is easy to test.
-import { sidedList, sideOf } from "./store-core.js";
-import { BYID, END, buildStops, reorderFrom, turnText, parseCommand, textToItems, sectionOf, matchSection } from "./route.js";
+import { sidedList, sideOf, aisleWhere } from "./store-core.js";
+import { BYID, END, buildStops, reorderFrom, turnText, walkingOut, parseCommand, textToItems, sectionOf, matchSection } from "./route.js";
 
 export const STORE_NAME = "יוחננוף באר שבע";
 export const LIST_TTL_MS = 6 * 60 * 60 * 1000; // a list older than this counts as finished
@@ -33,7 +33,10 @@ export function routeText(st) {
 function directions(sec, prev, here) {
   const turn = turnText(sec, prev, here);
   if (here && here.id === sec.id) return "אתה כבר כאן.";
-  if (sec.aisle && turn.includes(`מעבר ${sec.aisle}`)) return `${turn} (${sec.short}).`;
+  if (sec.aisle && turn.includes(`מעבר ${sec.aisle}`)) {
+    const w = aisleWhere(sec, walkingOut(sec, prev, here));
+    return w.startsWith("מעבר") ? `${turn}. ${w.replace(/^מעבר \d+, /, "")}.` : `${turn} (${sec.short}).`;
+  }
   return `${turn}, אל ${sec.where}.`;
 }
 
@@ -47,7 +50,8 @@ function stopMessage(st) {
   const here = st.here ? BYID[st.here] : null;
   const prev = st.cur ? BYID[st.stops[st.cur - 1].id] : null;
   const head = `תחנה ${st.cur + 1} מתוך ${total}` + (sec.aisle ? "" : ` ${sec.num}`);
-  return `${head}\n${directions(sec, here ? null : prev, here)}\nקח: ${sidedList(sec, s.items)}\n\nכתוב "הבא" כשסיימת כאן.`;
+  const flip = walkingOut(sec, here ? null : prev, here);
+  return `${head}\n${directions(sec, here ? null : prev, here)}\nקח: ${sidedList(sec, s.items, flip)}\n\nכתוב "הבא" כשסיימת כאן.`;
 }
 
 export const HELP = `שלום! 👋 אני עוזר הקניות של ${STORE_NAME}.

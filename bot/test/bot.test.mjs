@@ -110,3 +110,12 @@ test("paid endpoints only answer the site itself", async () => {
   assert.equal(sameSite(req({ "sec-fetch-site": "same-origin" }), url), true);
   assert.equal(sameSite(req({}), url), false);
 });
+
+test("aisle sides swap when the route walks back toward the entrance", async () => {
+  const { handle } = await import("../src/bot.js");
+  const o = { origin: "https://x" };
+  let s = handle(null, "פסטה שמן זית חלב", o).state;
+  const r = handle(s, "אני במעבר 2", o).replies[0].text;
+  assert.match(r, /במעבר האמצעי עד מעבר 7/);
+  assert.match(r, /קח: משמאל שמן זית\. מימין פסטה/);
+});

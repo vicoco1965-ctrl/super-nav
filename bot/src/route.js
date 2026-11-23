@@ -1,6 +1,6 @@
 // Route building and Hebrew directions for the bot. Same ordering rules as the site.
 import { DIST } from "./distances.js";
-import { SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK, BACK_ORDER, clean, matchSection, leg, startsKw, splitList, whereFromWords } from "./store-core.js";
+import { SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, splitList, whereFromWords } from "./store-core.js";
 
 export const END = { id: "checkout", where: "הקופות בקיר השמאלי, ממול המעברים ומיד אחרי השתייה: קודם קופות השירות העצמי ואחריהן הקופאיות", stop: CHECKOUT, num: "✓" };
 
@@ -60,26 +60,29 @@ export function reorderFrom(here, rest) {
   return orderStops(here.stop, rest, mine >= 0);
 }
 
-const isBack = x => x.stop[1] <= BACK + 1 || x.id === "nuts";
-// direction to reach section s, coming from section prev (null = the entrance), here = known position
+// direction to reach section s, coming from section prev (null = the entrance), here = known position.
+// Same as genericTurn()/turnText() in the site: read the turns off the walking path.
+const fromPoint = (prev, here) => (here ? here.stop : prev ? prev.stop : ENTRANCE);
 export function turnText(s, prev, here) {
-  if (here) {
-    if (here.id === s.id) return "אתה כבר כאן";
-    if (s.id === "checkout") return "המשך לקופות בקיר השמאלי, אחרי השתייה";
-    if (s.aisle) return here.aisle ? (Math.abs(s.aisle - here.aisle) === 1 ? "עבור למעבר הסמוך" : `חזור למעבר הראשי והמשך עד מעבר ${s.aisle}`) : `המשך עד מעבר ${s.aisle}`;
-    return "מכאן המשך";
-  }
-  if (!prev) return "מהכניסה, עבור את מבואת המבצעים והמשך ישר";
-  if (s.id === "checkout") return prev.id === "drinks" ? "המשך באותו כיוון לאורך הקיר, הקופות מיד אחרי השתייה" : "המשך לקופות בקיר השמאלי, אחרי השתייה";
-  if (s.id === "drinks") return ["fish", "ffish", "meat", "chicken", "frozen"].includes(prev.id) ? "עם הגב לקצביות, עבור את המקפיא השטוח, והשתייה מימינך" : "פנה לקיר השמאלי של החנות";
-  const fixed = { nuts: "המשך ישר כמעט עד הסוף ופנה שמאלה", dairy: prev.id === "nuts" ? "פנה ימינה" : "המשך לפינה הימנית האחורית",
-    ddeli: "הסתובב", bakery: "פנה שמאלה", meat: "המשך ישר", frozen: "הסתובב" };
-  if (fixed[s.id]) return fixed[s.id];
-  if (s.id === "beer") return isBack(prev) ? "פנה למעבר הראשי" : "המשך במעבר הראשי עד הסוף";
-  if (prev.stop[0] > 200 && !isBack(prev)) return "פנה שמאלה למעבר הראשי" + (s.aisle ? ` והמשך עד מעבר ${s.aisle}` : "");
-  if (s.aisle) return prev.aisle && Math.abs(s.aisle - prev.aisle) === 1 ? "המעבר הבא" : isBack(prev) || prev.id === "beer" ? `פנה למעבר הראשי והמשך עד מעבר ${s.aisle}` : `המשך במעבר הראשי עד מעבר ${s.aisle}`;
-  if (s.id === "home") return "המשך לקיר הימני, מיד אחרי מקרר העלים";
-  return s.stop[0] > 200 ? "המשך ישר" : "המשך במעבר הראשי";
+  if (here && here.id === s.id) return "אתה כבר כאן";
+  const p = leg(fromPoint(prev, here), s.stop).filter((q, k, a) => !k || q[0] !== a[k - 1][0] || q[1] !== a[k - 1][1]);
+  const dirs = [];
+  for (let k = 1; k < p.length; k++) { const dx = Math.sign(p[k][0] - p[k - 1][0]), dy = Math.sign(p[k][1] - p[k - 1][1]); if (dx || dy) { const last = dirs[dirs.length - 1]; if (!last || last[0] !== dx || last[1] !== dy) dirs.push([dx, dy]); } }
+  const turns = [];
+  for (let k = 1; k < dirs.length; k++) { const c = dirs[k - 1][0] * dirs[k][1] - dirs[k - 1][1] * dirs[k][0]; if (c) turns.push(c > 0 ? "ימינה" : "שמאלה"); }
+  const lead = !prev && !here ? "מהכניסה, " : "";
+  if (s.id === "checkout") return lead + (turns.length ? `פנה ${turns[0]} והמשך לקופות בקיר השמאלי` : "המשך ישר לקופות בקיר השמאלי");
+  if (!turns.length) return lead + "המשך ישר" + (s.aisle ? ` במעבר האמצעי עד מעבר ${s.aisle}` : "");
+  const t = turns.length === 1 ? `פנה ${turns[0]}` : turns[0] === turns[1] ? `פנה ${turns[0]} ושוב ${turns[1]}` : `פנה ${turns[0]} ואז ${turns[1]}`;
+  return lead + t + (s.aisle ? ` במעבר האמצעי עד מעבר ${s.aisle}` : "");
+}
+
+// true when the walk reaches this aisle heading toward the entrance, so left and right swap (walkingOut() in the site)
+export function walkingOut(s, prev, here) {
+  if (!s.aisle) return false;
+  const p = leg(fromPoint(prev, here), s.stop);
+  for (let k = p.length - 1; k > 0; k--) { const dy = p[k][1] - p[k - 1][1]; if (Math.abs(dy) > 0.5 && Math.abs(p[k][0] - p[k - 1][0]) < 0.5) return dy > 0; }
+  return false;
 }
 
 // ---------- Understanding messages ----------
