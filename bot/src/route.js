@@ -27,29 +27,42 @@ export function buildStops(items) {
   return orderStops(ENTRANCE, sorted, false);
 }
 
-// Order stops for the shortest walk from `start` to the checkouts: nearest-next, then 2-opt to undo detours.
-// Same as orderStops() in the site. lockFirst keeps stop 0 in place.
+// Order stops for the shortest walk from `start` to the checkouts. Same as orderStops() in the site:
+// exact (dynamic programming over every order) for up to EXACT stops, else nearest-next plus 2-opt and or-opt.
+// lockFirst keeps stop 0 in place.
+export const EXACT = 10; // the site uses 13; 11+ costs ~8ms+ CPU, too close to the free plan limit
 export function orderStops(start, list, lockFirst) {
-  const rest = list.slice(), ordered = [];
+  const rest = list.slice(), head = [];
   let pos = start;
-  if (lockFirst && rest.length) { ordered.push(rest.shift()); pos = BYID[ordered[0].id].stop; }
-  while (rest.length) {
-    let bi = 0, bd = Infinity;
-    rest.forEach((s, i) => { const d = walk(pos, BYID[s.id].stop); if (d < bd) { bd = d; bi = i; } });
-    pos = BYID[rest[bi].id].stop; ordered.push(rest.splice(bi, 1)[0]);
-  }
-  const cost = seq => { let d = 0, p = start; for (const x of seq) { d += walk(p, BYID[x.id].stop); p = BYID[x.id].stop; } return d + walk(p, CHECKOUT); };
-  let best = ordered, bestCost = cost(best);
-  const lock = lockFirst ? 1 : 0;
-  for (let improved = true, rounds = 0; improved && rounds < 50; rounds++) {
-    improved = false;
-    for (let i = lock; i < best.length - 1; i++) for (let j = i + 1; j < best.length; j++) {
-      const cand = best.slice(0, i).concat(best.slice(i, j + 1).reverse(), best.slice(j + 1));
-      const c = cost(cand);
-      if (c < bestCost - 0.5) { best = cand; bestCost = c; improved = true; }
+  if (lockFirst && rest.length) { head.push(rest.shift()); pos = BYID[head[0].id].stop; }
+  const n = rest.length; if (n < 2) return head.concat(rest);
+  const P = rest.map(s => BYID[s.id].stop), D = P.map(a => P.map(b => walk(a, b)));
+  const S0 = P.map(q => walk(pos, q)), E = P.map(q => walk(q, CHECKOUT));
+  if (n <= EXACT) {
+    const N = 1 << n, dp = new Float64Array(N * n).fill(Infinity), par = new Int8Array(N * n).fill(-1);
+    for (let i = 0; i < n; i++) dp[(1 << i) * n + i] = S0[i];
+    for (let m = 1; m < N; m++) for (let i = 0; i < n; i++) {
+      const v = dp[m * n + i]; if (!(m & (1 << i)) || v === Infinity) continue;
+      for (let j = 0; j < n; j++) { if (m & (1 << j)) continue; const m2 = m | (1 << j), w = v + D[i][j]; if (w < dp[m2 * n + j]) { dp[m2 * n + j] = w; par[m2 * n + j] = i; } }
     }
+    let best = Infinity, last = 0, m = N - 1;
+    for (let i = 0; i < n; i++) { const w = dp[m * n + i] + E[i]; if (w < best) { best = w; last = i; } }
+    const seq = [];
+    while (last >= 0) { seq.push(last); const pr = par[m * n + last]; m &= ~(1 << last); last = pr; }
+    return head.concat(seq.reverse().map(k => rest[k]));
   }
-  return best;
+  let ord = [], left = [...Array(n).keys()], cur0 = -1;
+  while (left.length) { let bi = 0, bd = Infinity; left.forEach((k, i) => { const d = cur0 < 0 ? S0[k] : D[cur0][k]; if (d < bd) { bd = d; bi = i; } }); cur0 = left.splice(bi, 1)[0]; ord.push(cur0); }
+  const cost = o => { let d = S0[o[0]]; for (let k = 1; k < o.length; k++) d += D[o[k - 1]][o[k]]; return d + E[o[o.length - 1]]; };
+  for (let improved = true, rounds = 0; improved && rounds < 60; rounds++) {
+    improved = false;
+    for (let i = 0; i < n - 1; i++) for (let j = i + 1; j < n; j++) {
+      const c = ord.slice(0, i).concat(ord.slice(i, j + 1).reverse(), ord.slice(j + 1)); if (cost(c) < cost(ord) - 0.5) { ord = c; improved = true; }
+    }
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { if (i === j) continue;
+      const c = ord.slice(); const [x] = c.splice(i, 1); c.splice(j, 0, x); if (cost(c) < cost(ord) - 0.5) { ord = c; improved = true; } }
+  }
+  return head.concat(ord.map(k => rest[k]));
 }
 
 // Re-order the remaining stops from where the customer stands: their own section first.

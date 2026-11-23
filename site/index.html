@@ -595,7 +595,7 @@ function genericTurn(i) {
   for (let k = 1; k < dirs.length; k++) { const c = dirs[k - 1][0] * dirs[k][1] - dirs[k - 1][1] * dirs[k][0]; if (c) turns.push(c > 0 ? "ימינה" : "שמאלה"); }
   const lead = i === 0 ? "מהכניסה, " : "";
   const co = STORE.generated ? "לקופות" : "לקופות בקיר השמאלי";
-  if (s.end) return lead + (turns.length ? `פנה ${turns[0]} והמשך ${co}` : `המשך ישר ${co}`);
+  if (stops[i].end) return lead + (turns.length ? `פנה ${turns[0]} והמשך ${co}` : `המשך ישר ${co}`);
   if (!turns.length) return lead + "המשך ישר";
   const t = turns.length === 1 ? `פנה ${turns[0]}` : turns[0] === turns[1] ? `פנה ${turns[0]} ושוב ${turns[1]}` : `פנה ${turns[0]} ואז ${turns[1]}`;
   return lead + t + (s.aisle ? ` למעבר ${s.aisle}` : "");
@@ -720,17 +720,22 @@ function aisleWhere(sec, flip) {
   if (!sec.left || sec.left === sec.right) return sec.where;
   return flip ? `מעבר ${sec.aisle}, מימינך ${sec.left}, משמאלך ${sec.right}` : `מעבר ${sec.aisle}, משמאלך ${sec.left}, מימינך ${sec.right}`;
 }
+// how each department is named out loud ("המשך ישר אל המאפייה")
+const VOICE_NAME = { produce: "הפירות והירקות", greens: "מקרר העלים", home: "כלי הבית", crackers: "קיר הפריכיות והרטבים", ketchup: "מדף הקטשופים", mayo: "מדף המיונז",
+  nuts: "הפיצוחים", dairy: "מקררי החלב", ddeli: "מעדניית הגבינות", bakery: "המאפייה", fish: "דלפק הדגים", ffish: "מקרר הדגים הקפואים", meat: "קצביית הבשר",
+  chicken: "קצביית העוף", sausage: "מקררי הנקניקיות", frozen: "מקררי הקפואים", drinks: "השתייה", beer: "הבירות", paper: "הנייר הסופג" };
 function stopText(i) {
   let s = stops[i];
   const turn = turnText(i);
-  if (s.end) return { turn, where: s.section.where, take: "סיימת את הרשימה", say: `${turn}, אל ${s.section.where}. סיימת את כל הרשימה, בהצלחה!` };
+  if (s.end) return { turn, where: s.section.where, take: "סיימת את הרשימה", say: `${turn}. זהו, סיימת את הרשימה. בהצלחה!` };
   const flip = walkingOut(i);
   const list = sidedList(s.section, s.items, flip);
   const total = stops.length - 1;
   if (s.section.aisle) s = { ...s, section: { ...s.section, where: aisleWhere(s.section, flip) } };
-  if (here && i === cur && here.id === s.section.id) return { turn, where: s.section.where, take: "קח: " + list, say: `אתה ${inPlace(s.section.where)}. קח ${list}.` };
-  const lead = here && i === cur ? `אתה ליד ${here.where}. ` : "";
-  return { turn, where: s.section.where, take: "קח: " + list, say: `${lead}תחנה ${i + 1} מתוך ${total}. ${turn}, אל ${s.section.where}. קח ${list}.` };
+  if (here && i === cur && here.id === s.section.id) return { turn, where: s.section.where, take: "קח: " + list, say: `אתה כבר כאן. קח ${list}.` };
+  // spoken: short and conversational, no stop numbers; the aisle sides are already in the list
+  const spoken = s.section.aisle ? `${turn}. ${s.section.left && s.section.left !== s.section.right ? list : "קח " + list}.` : `${turn} אל ${VOICE_NAME[s.section.id] || s.section.short}. קח ${list}.`;
+  return { turn, where: s.section.where, take: "קח: " + list, say: spoken };
 }
 function routeText() {
   const lines = [`🛒 המסלול שלי בסופר (${STORE.title}):`];
@@ -874,7 +879,8 @@ function pickVoice() {
   // one Hebrew voice for the whole trip: Google's Hebrew voice first (clearest on Android), never an English one
   try {
     const he = speechSynthesis.getVoices().filter(v => /^(he|iw)([-_]|$)/i.test(v.lang));
-    const best = he.find(v => /google/i.test(v.name)) || he.find(v => !v.localService) || he[0] || null;
+    // the online (network) Google voice sounds the most natural; then any online voice, then the offline Google one
+    const best = he.find(v => /google/i.test(v.name) && !v.localService) || he.find(v => !v.localService) || he.find(v => /google/i.test(v.name)) || he[0] || null;
     if (best && !heVoice) heVoice = best;   // once chosen, keep it (no switching voices mid-route)
   } catch (e) {}
   voiceNote();
@@ -899,7 +905,7 @@ async function speak(text) {
   // the phone's Hebrew voice is the only voice used when it exists; the Claude voice reads Hebrew
   // with an English accent, so it is used only on devices that have no Hebrew voice at all
   if (heVoice) {
-    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.voice = heVoice; u.lang = "he-IL"; u.rate = 0.95; u.pitch = 1; speechSynthesis.speak(u); } catch (e) {}
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.voice = heVoice; u.lang = "he-IL"; u.rate = 1.02; u.pitch = 1; speechSynthesis.speak(u); } catch (e) {}
     return;
   }
   if (tts) {
@@ -1207,24 +1213,38 @@ let here = null; // section the customer was last seen at
 const pathLen = (a, b) => { const p = leg(a, b); let d = 0; for (let i = 1; i < p.length; i++) d += Math.abs(p[i][0] - p[i - 1][0]) + Math.abs(p[i][1] - p[i - 1][1]); return d; };
 // Order stops for the shortest walk from `start` to `endPos`: nearest-next, then 2-opt to undo detours.
 // lockFirst keeps stop 0 in place (the section the customer is standing in).
+// shortest walk: exact for up to 13 stops (every order is checked, by dynamic programming), otherwise nearest-next plus 2-opt and or-opt
 function orderStops(start, list, endPos, lockFirst) {
-  let rest = list.slice(), ordered = [], pos = start;
-  if (lockFirst && rest.length) { ordered.push(rest.shift()); pos = ordered[0].section.stop; }
-  while (rest.length) {
-    let bi = 0, bd = Infinity;
-    rest.forEach((s, i) => { const d = pathLen(pos, s.section.stop); if (d < bd) { bd = d; bi = i; } });
-    pos = rest[bi].section.stop; ordered.push(rest.splice(bi, 1)[0]);
-  }
-  const cost = seq => { let d = 0, p = start; for (const x of seq) { d += pathLen(p, x.section.stop); p = x.section.stop; } return d + pathLen(p, endPos); };
-  const lock = lockFirst ? 1 : 0;
-  for (let improved = true, rounds = 0; improved && rounds < 50; rounds++) {
-    improved = false;
-    for (let i = lock; i < ordered.length - 1; i++) for (let j = i + 1; j < ordered.length; j++) {
-      const cand = ordered.slice(0, i).concat(ordered.slice(i, j + 1).reverse(), ordered.slice(j + 1));
-      if (cost(cand) < cost(ordered) - 0.5) { ordered = cand; improved = true; }
+  let rest = list.slice(), head = [], pos = start;
+  if (lockFirst && rest.length) { head.push(rest.shift()); pos = head[0].section.stop; }
+  const n = rest.length; if (n < 2) return head.concat(rest);
+  const P = rest.map(s => s.section.stop), D = P.map(a => P.map(b => pathLen(a, b)));
+  const S0 = P.map(q => pathLen(pos, q)), E = P.map(q => pathLen(q, endPos));
+  if (n <= 13) {
+    const N = 1 << n, dp = new Float64Array(N * n).fill(Infinity), par = new Int8Array(N * n).fill(-1);
+    for (let i = 0; i < n; i++) dp[(1 << i) * n + i] = S0[i];
+    for (let m = 1; m < N; m++) for (let i = 0; i < n; i++) {
+      const v = dp[m * n + i]; if (!(m & (1 << i)) || v === Infinity) continue;
+      for (let j = 0; j < n; j++) { if (m & (1 << j)) continue; const m2 = m | (1 << j), w = v + D[i][j]; if (w < dp[m2 * n + j]) { dp[m2 * n + j] = w; par[m2 * n + j] = i; } }
     }
+    let best = Infinity, last = 0, m = N - 1;
+    for (let i = 0; i < n; i++) { const w = dp[m * n + i] + E[i]; if (w < best) { best = w; last = i; } }
+    const seq = [];
+    while (last >= 0) { seq.push(last); const pr = par[m * n + last]; m &= ~(1 << last); last = pr; }
+    return head.concat(seq.reverse().map(k => rest[k]));
   }
-  return ordered;
+  let ord = [], left = [...Array(n).keys()], cur0 = -1;
+  while (left.length) { let bi = 0, bd = Infinity; left.forEach((k, i) => { const d = cur0 < 0 ? S0[k] : D[cur0][k]; if (d < bd) { bd = d; bi = i; } }); cur0 = left.splice(bi, 1)[0]; ord.push(cur0); }
+  const cost = o => { let d = S0[o[0]]; for (let k = 1; k < o.length; k++) d += D[o[k - 1]][o[k]]; return d + E[o[o.length - 1]]; };
+  for (let improved = true, rounds = 0; improved && rounds < 60; rounds++) {
+    improved = false;
+    for (let i = 0; i < n - 1; i++) for (let j = i + 1; j < n; j++) {
+      const c = ord.slice(0, i).concat(ord.slice(i, j + 1).reverse(), ord.slice(j + 1)); if (cost(c) < cost(ord) - 0.5) { ord = c; improved = true; }
+    }
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { if (i === j) continue;
+      const c = ord.slice(); const [x] = c.splice(i, 1); c.splice(j, 0, x); if (cost(c) < cost(ord) - 0.5) { ord = c; improved = true; } }
+  }
+  return head.concat(ord.map(k => rest[k]));
 }
 function relocate(sec) {
   here = sec;

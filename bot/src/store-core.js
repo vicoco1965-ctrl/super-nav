@@ -276,7 +276,7 @@ function genericTurn(i) {
   for (let k = 1; k < dirs.length; k++) { const c = dirs[k - 1][0] * dirs[k][1] - dirs[k - 1][1] * dirs[k][0]; if (c) turns.push(c > 0 ? "ימינה" : "שמאלה"); }
   const lead = i === 0 ? "מהכניסה, " : "";
   const co = STORE.generated ? "לקופות" : "לקופות בקיר השמאלי";
-  if (s.end) return lead + (turns.length ? `פנה ${turns[0]} והמשך ${co}` : `המשך ישר ${co}`);
+  if (stops[i].end) return lead + (turns.length ? `פנה ${turns[0]} והמשך ${co}` : `המשך ישר ${co}`);
   if (!turns.length) return lead + "המשך ישר";
   const t = turns.length === 1 ? `פנה ${turns[0]}` : turns[0] === turns[1] ? `פנה ${turns[0]} ושוב ${turns[1]}` : `פנה ${turns[0]} ואז ${turns[1]}`;
   return lead + t + (s.aisle ? ` למעבר ${s.aisle}` : "");
@@ -436,5 +436,9 @@ function aisleWhere(sec, flip) {
   if (!sec.left || sec.left === sec.right) return sec.where;
   return flip ? `מעבר ${sec.aisle}, מימינך ${sec.left}, משמאלך ${sec.right}` : `מעבר ${sec.aisle}, משמאלך ${sec.left}, מימינך ${sec.right}`;
 }
+// how each department is named out loud ("המשך ישר אל המאפייה")
+const VOICE_NAME = { produce: "הפירות והירקות", greens: "מקרר העלים", home: "כלי הבית", crackers: "קיר הפריכיות והרטבים", ketchup: "מדף הקטשופים", mayo: "מדף המיונז",
+  nuts: "הפיצוחים", dairy: "מקררי החלב", ddeli: "מעדניית הגבינות", bakery: "המאפייה", fish: "דלפק הדגים", ffish: "מקרר הדגים הקפואים", meat: "קצביית הבשר",
+  chicken: "קצביית העוף", sausage: "מקררי הנקניקיות", frozen: "מקררי הקפואים", drinks: "השתייה", beer: "הבירות", paper: "הנייר הסופג" };
 
 export { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList, aisleWhere };

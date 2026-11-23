@@ -49,7 +49,7 @@ function stopMessage(st) {
   const s = st.stops[st.cur], sec = BYID[s.id];
   const here = st.here ? BYID[st.here] : null;
   const prev = st.cur ? BYID[st.stops[st.cur - 1].id] : null;
-  const head = `תחנה ${st.cur + 1} מתוך ${total}` + (sec.aisle ? "" : ` ${sec.num}`);
+  const head = sec.aisle ? `מעבר ${sec.aisle}` : `${sec.num} ${sec.short}`;
   const flip = walkingOut(sec, here ? null : prev, here);
   return `${head}\n${directions(sec, here ? null : prev, here)}\nקח: ${sidedList(sec, s.items, flip)}\n\nכתוב "הבא" כשסיימת כאן.`;
 }

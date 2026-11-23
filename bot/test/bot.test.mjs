@@ -124,3 +124,15 @@ test("aisle sides: as-is walking up from the entrance side, swapped walking back
   assert.match(back, /מימינך שמן וחומץ/);
   assert.match(back, /קח: מימין שמן זית\. משמאל פסטה/);
 });
+
+test("route order is the shortest walk (checked against every order)", async () => {
+  const { orderStops, walk, BYID } = await import("../src/route.js");
+  const { ENTRANCE, CHECKOUT } = await import("../src/store-core.js");
+  const ids = ["a3", "dairy", "a11", "drinks", "home", "a6", "sausage"].filter(id => BYID[id]);
+  const list = ids.map(id => ({ id, items: [id] }));
+  const cost = seq => { let d = 0, p = ENTRANCE; for (const x of seq) { d += walk(p, BYID[x.id].stop); p = BYID[x.id].stop; } return d + walk(p, CHECKOUT); };
+  let best = Infinity;
+  const perm = (a, k) => { if (k === a.length) { best = Math.min(best, cost(a)); return; } for (let i = k; i < a.length; i++) { [a[k], a[i]] = [a[i], a[k]]; perm(a, k + 1); [a[k], a[i]] = [a[i], a[k]]; } };
+  perm(list.slice(), 0);
+  assert.ok(Math.abs(cost(orderStops(ENTRANCE, list, false)) - best) < 0.01);
+});
