@@ -23,8 +23,8 @@ const cta = (origin, st, body) => ({ type: "cta", body, label: "🧭 התחל נ
 
 export function routeText(st) {
   const rest = st.stops.slice(st.cur);
-  const lines = [st.here ? `🛒 המסלול מכאן (${rest.length} תחנות):` : `🛒 המסלול שלך ב${STORE_NAME} (${rest.length} תחנות):`];
-  rest.forEach((s, i) => lines.push(`${i + 1}. ${label(BYID[s.id])}: ${sidedList(BYID[s.id], s.items)}`));
+  const lines = [st.here ? "🛒 המסלול מכאן:" : `🛒 המסלול שלך ב${STORE_NAME}:`];
+  rest.forEach(s => lines.push(`• ${label(BYID[s.id])}: ${sidedList(BYID[s.id], s.items)}`));
   lines.push("✓ ואז לקופות");
   return lines.join("\n");
 }
