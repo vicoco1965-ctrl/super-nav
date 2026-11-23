@@ -1,4 +1,5 @@
 // The conversation: state + one customer message -> new state + replies. No network here, so it is easy to test.
+import { sidedList, sideOf } from "./store-core.js";
 import { BYID, END, buildStops, reorderFrom, turnText, parseCommand, textToItems, sectionOf, matchSection } from "./route.js";
 
 export const STORE_NAME = "יוחננוף באר שבע";
@@ -7,7 +8,7 @@ export const LIST_TTL_MS = 6 * 60 * 60 * 1000; // a list older than this counts 
 export const emptyState = () => ({ items: [], stops: [], cur: 0, here: null, skipped: [], updated: 0 });
 const active = (st, now) => st && st.stops.length && now - st.updated < LIST_TTL_MS;
 
-const label = sec => (sec.aisle ? sec.name : `${sec.num} ${sec.name}`);
+const label = sec => (sec.aisle ? `מעבר ${sec.aisle}` : `${sec.num} ${sec.name}`);
 const tx = text => ({ type: "text", text });
 
 export function navLink(origin, st) {
@@ -23,7 +24,7 @@ const cta = (origin, st, body) => ({ type: "cta", body, label: "🧭 התחל נ
 export function routeText(st) {
   const rest = st.stops.slice(st.cur);
   const lines = [st.here ? `🛒 המסלול מכאן (${rest.length} תחנות):` : `🛒 המסלול שלך ב${STORE_NAME} (${rest.length} תחנות):`];
-  rest.forEach((s, i) => lines.push(`${i + 1}. ${label(BYID[s.id])}: ${s.items.join(", ")}`));
+  rest.forEach((s, i) => lines.push(`${i + 1}. ${label(BYID[s.id])}: ${sidedList(BYID[s.id], s.items)}`));
   lines.push("✓ ואז לקופות");
   return lines.join("\n");
 }
@@ -46,7 +47,7 @@ function stopMessage(st) {
   const here = st.here ? BYID[st.here] : null;
   const prev = st.cur ? BYID[st.stops[st.cur - 1].id] : null;
   const head = `תחנה ${st.cur + 1} מתוך ${total}` + (sec.aisle ? "" : ` ${sec.num}`);
-  return `${head}\n${directions(sec, here ? null : prev, here)}\nקח: ${s.items.join(", ")}\n\nכתוב "הבא" כשסיימת כאן.`;
+  return `${head}\n${directions(sec, here ? null : prev, here)}\nקח: ${sidedList(sec, s.items)}\n\nכתוב "הבא" כשסיימת כאן.`;
 }
 
 export const HELP = `שלום! 👋 אני עוזר הקניות של ${STORE_NAME}.
@@ -167,7 +168,8 @@ function ask(st, items, now, origin) {
   for (const it of items) {
     const sec = it.section && BYID[it.section];
     if (!sec) { lines.push(`❓ לא מצאתי איפה נמצא ${it.name}. אפשר לשאול עובד, או לנסות מילה אחרת.`); continue; }
-    lines.push(`📍 ${it.name}: ${sec.where}.`);
+    const side = sec.aisle && sec.kwL ? sideOf(sec, it.name) : "";
+    lines.push(sec.aisle ? `📍 ${it.name}: מעבר ${sec.aisle}${side === "L" ? ", בצד שמאל" : side === "R" ? ", בצד ימין" : ""}.` : `📍 ${it.name}: ${sec.where}.`);
     known.push(it);
   }
   if (!known.length || !active(st, now)) return { state: st, replies: [tx(lines.join("\n"))] };

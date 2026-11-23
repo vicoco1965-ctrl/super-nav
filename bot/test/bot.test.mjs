@@ -62,6 +62,7 @@ test("'where is' answers and adds to the list as the next stop", () => {
   let { st } = run([["חלב, במבה"], ["הבא"]]);
   const r = handle(st, "איפה הטונה?", { now: 1e12 + 9000, origin: O });
   assert.match(r.replies[0].text, /טונה: מעבר 6/);
+  assert.match(handle(st, "איפה שמן זית?", { now: 1e12 + 9000, origin: O }).replies[0].text, /שמן זית: מעבר 7, בצד שמאל/);
   assert.equal(r.state.stops[r.state.cur].id, "a6");
 });
 

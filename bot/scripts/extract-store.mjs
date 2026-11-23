@@ -17,10 +17,11 @@ export function buildCore(html) {
     cut("// corridors the customer walks", "const pts ="),
     cut("// true when a known product word", "// Speech -> list"),
     cut("const HEB_NUM", "function rebuildPicker"),
+    cut("function sideOf", "function stopText"),
   ];
   return `// GENERATED from site/index.html by bot/scripts/extract-store.mjs. Do not edit by hand.\n` +
     parts.join("\n\n") +
-    `\n\nexport { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords };\n`;
+    `\n\nexport { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList };\n`;
 }
 // Walking distances between every pair of stops, worked out ahead of time: the Worker's free plan
 // allows only a few milliseconds of CPU per message, too little to run the path search each time.
