@@ -71,7 +71,7 @@ export function turnText(s, prev, here) {
   }
   if (!prev) return "מהכניסה, עבור את מבואת המבצעים והמשך ישר";
   if (s.id === "checkout") return prev.id === "drinks" ? "המשך ישר, הקופות מימינך" : "המשך לקופות בצד שמאל של החנות";
-  if (s.id === "drinks") return prev.id === "meat" || prev.id === "frozen" ? "עם הגב למעדניית הבשר, עבור את המקפיא השטוח, והשתייה מימינך" : "פנה לקיר השמאלי של החנות";
+  if (s.id === "drinks") return ["fish", "meat", "chicken", "frozen"].includes(prev.id) ? "עם הגב לקצביות, עבור את המקפיא השטוח, והשתייה מימינך" : "פנה לקיר השמאלי של החנות";
   const fixed = { nuts: "המשך ישר כמעט עד הסוף ופנה שמאלה", dairy: prev.id === "nuts" ? "פנה ימינה" : "המשך לפינה הימנית האחורית",
     ddeli: "הסתובב", bakery: "פנה שמאלה", meat: "המשך ישר", frozen: "הסתובב" };
   if (fixed[s.id]) return fixed[s.id];

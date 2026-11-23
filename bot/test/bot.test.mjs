@@ -74,9 +74,9 @@ test("a new list after 6 hours replaces the old one; within the trip it adds", (
 });
 
 test("AI hints place unknown products", () => {
-  assert.deepEqual(unknownNames("חלב, קפה", "text"), ["קפה"]);
-  const r = handle(null, "חלב, קפה", { now: 1e12, origin: O, hints: { "קפה": "a3" } });
-  assert.ok(r.state.stops.some(s => s.id === "a3" && s.items.includes("קפה")));
+  assert.deepEqual(unknownNames("חלב, מטריה", "text"), ["מטריה"]);
+  const r = handle(null, "חלב, מטריה", { now: 1e12, origin: O, hints: { "מטריה": "home" } });
+  assert.ok(r.state.stops.some(s => s.id === "home" && s.items.includes("מטריה")));
 });
 
 test("photo text is always a list", () => {
