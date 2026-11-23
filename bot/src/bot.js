@@ -41,7 +41,7 @@ function stopMessage(st) {
   const total = st.stops.length;
   if (st.cur >= total) {
     const prev = total ? BYID[st.stops[total - 1].id] : null;
-    return `🎉 סיימת את כל הרשימה! ${turnText(END, prev, null)}, אל ${END.where}.`;
+    return `🎉 סיימת את כל הרשימה! ${turnText(END, prev, null)}: קודם קופות השירות העצמי ואחריהן הקופאיות.`;
   }
   const s = st.stops[st.cur], sec = BYID[s.id];
   const here = st.here ? BYID[st.here] : null;
