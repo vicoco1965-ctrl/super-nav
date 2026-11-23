@@ -327,8 +327,8 @@ let SECTIONS = [
   {id:"greens", name:"מקרר עלים ירוקים", short:"עלים", where:"מקרר העלים הגדול, בקיר שממולך ובצד ימין", num:"🌿", order:2,
    rect:[230,446,115,26], stop:[RIGHT,470],
    kw:["כוסברה","פטרוזיליה","שמיר","נענע","חסה","בזיליקום","עלים","בצל ירוק","תרד","רוקט","עירית","סלרי","מנגולד"]},
-  {id:"home", est:true, name:"כלי בית", short:"כלי בית ?", where:"מחלקת כלי הבית (מיקום משוער)", num:"🍳", order:4,
-   rect:[70,478,145,70], stop:[SPINE,512],
+  {id:"home", name:"כלי בית", short:"כלי בית", where:"מחלקת כלי הבית, ליד מקרר העלים", num:"🍳", order:4,
+   rect:[160,470,60,28], stop:[190,CONNECT],
    kw:["סיר","מחבת","כלי בית","סכו\"ם","סכום","קומקום","קרש חיתוך","סכין","מגבת","קופסאות אחסון","כוס זכוכית"]},
   {id:"nuts", name:"פיצוחים", short:"פיצוחים", where:"מחלקת הפיצוחים, בצד ימין", num:"🥜", order:3,
    rect:[300,128,45,30], stop:[RIGHT,143],
@@ -357,8 +357,8 @@ let SECTIONS = [
   {id:"frozen", name:"קפואים, בצקים ומקררי נקניק ובשר", short:"קפואים ובצקים", where:"גוש המקררים במרכז האזור האחורי, ממול הקצביות: קפואים, בצקים, נקניקים ובשר ארוז", num:"❄", order:8,
    rect:[68,58,60,8], rect2:[68,72,60,8], stop:[105,BACK],
    kw:["גלידה","קפוא","קפואה","קפואים","פיצה","בצק עלים","בורקס","ארטיק","קרטיב","מלאווח","ג'חנון","ירקות קפואים","בשר קפוא","שניצל קפוא","בצק","בצקים","בצק פילו","נקניק","נקניקיות","פסטרמה","סלמי","הודו פרוס","בשר ארוז"]},
-  {id:"drinks", name:"שתייה", short:"שתייה", where:"מחלקת השתייה, לאורך כל הקיר השמאלי של החנות", num:"🥤", order:31,
-   rect:[14,96,30,420], stop:[LEFT,300],
+  {id:"drinks", name:"שתייה", short:"שתייה", where:"מחלקת השתייה, בקיר השמאלי של החנות", num:"🥤", order:31,
+   rect:[14,96,30,250], stop:[LEFT,220],
    kw:["מים","קולה","קוקה","מיץ","סודה","ספרייט","פאנטה","תפוזינה","פטל","משקה","שתייה","שתיה","נביעות","מי עדן","ספרינג","פריגת","פיוז טי","אייס טי","משקה אנרגיה","רד בול","סיידר"]},
   {id:"a1", aisle:1, name:"מעבר 1: משמאל דגני בוקר, מימין בייגלה וקרקרים", short:"דגני בוקר וקרקרים", num:"1", order:11, left:"דגני בוקר", right:"בייגלה וקרקרים",
    kwL:["קורנפלקס","דגני","דגני בוקר","גרנולה","שיבולת","קוואקר","מוזלי","בריאות","ללא גלוטן"],
@@ -411,7 +411,7 @@ for (const s of SECTIONS) {
 }
 
 let BYID = Object.fromEntries(SECTIONS.map(s => [s.id, s]));
-let ENTRANCE = [RIGHT, 690], CHECKOUT = [RIGHT, 626];
+let ENTRANCE = [RIGHT, 690], CHECKOUT = [LEFT, 560];
 const BACK_ORDER = 9; // sections with order <= this (after produce) are in the back area
 // ---------- Stores: the built-in Yochananof map, or a store generated from a mapping (walls + aisles) ----------
 let STORE = { title: "יוחננוף באר שבע", generated: false, slug: "", W: 360, H: 660 };
@@ -666,7 +666,7 @@ function buildRoute() {
   const rank = sec => STORE.generated ? sec.order : sec.aisle ? (backUsed ? 10 + (15 - sec.aisle) : 10 + sec.aisle) : sec.id === "home" ? (backUsed ? 30 : 2.5) : sec.id === "beer" ? (backUsed ? 9 : 25) : sec.order;
   stops = Object.keys(groups).map(id => ({ section: BYID[id], items: groups[id] })).sort((a, b) => rank(a.section) - rank(b.section));
   stops = orderStops(ENTRANCE, stops, CHECKOUT, false);
-  stops.push({ section: { id: "checkout", where: STORE.generated ? `הקופות, ${STORE.g.coL ? "בצד שמאל" : "בצד ימין"} ליד הכניסה` : "הקופה הראשית, ליד הכניסה בצד ימין (קופות השירות העצמי והיציאה עם העגלות בצד שמאל של החנות)", stop: CHECKOUT, num: "✓" }, items: [], end: true });
+  stops.push({ section: { id: "checkout", where: STORE.generated ? `הקופות, ${STORE.g.coL ? "בצד שמאל" : "בצד ימין"} ליד הכניסה` : "הקופות בקיר השמאלי, אחרי השתייה: קודם קופות השירות העצמי ואחריהן הקופאיות", stop: CHECKOUT, num: "✓" }, items: [], end: true });
   cur = 0; renderNav(); drawMap(); updateShare();
 }
 
@@ -676,13 +676,13 @@ function turnText(i) {
   const s = stops[i].section;
   if (here && i === cur) {
     if (here.id === s.id) return "אתה כבר כאן";
-    if (s.end) return "חזור לכיוון הכניסה, הקופה הראשית מימין לה";
+    if (s.end) return "המשך לקופות בקיר השמאלי, אחרי השתייה";
     if (s.aisle) return here.aisle ? (Math.abs(s.aisle - here.aisle) === 1 ? "עבור למעבר הסמוך" : `חזור למעבר הראשי והמשך עד מעבר ${s.aisle}`) : `המשך עד מעבר ${s.aisle}`;
     return "מכאן המשך";
   }
   const prev = i === 0 ? null : stops[i - 1].section;
   if (i === 0) return "מהכניסה, עבור את מבואת המבצעים והמשך ישר";
-  if (s.end) return "חזור לכיוון הכניסה, הקופה הראשית מימין לה";
+  if (s.end) return prev.id === "drinks" ? "המשך באותו כיוון לאורך הקיר, הקופות מיד אחרי השתייה" : "המשך לקופות בקיר השמאלי, אחרי השתייה";
   if (s.id === "drinks") return ["fish","ffish","meat","chicken","frozen"].includes(prev.id) ? "עם הגב לקצביות, עבור את המקפיא השטוח, והשתייה מימינך" : "פנה לקיר השמאלי של החנות";
   const back = x => x.stop[1] <= BACK + 1 || x.id === "nuts";
   const fixed = { nuts: "המשך ישר כמעט עד הסוף ופנה שמאלה", dairy: prev.id === "nuts" ? "פנה ימינה" : "המשך לפינה הימנית האחורית",
@@ -792,10 +792,8 @@ function drawMap() {
   if (STORE.generated) drawGeneric(m, curId); else {
   m.appendChild(el("rect", { x: 10, y: 10, width: 340, height: 650, class: "wall", rx: 4 }));
   // promo foyer + entrance
-  m.appendChild(el("rect", { x: 230, y: 596, width: 62, height: 60, rx: 4, class: "zone promo" }));
-  m.appendChild(el("text", { x: 261, y: 626, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, "מבצעים"));
-  m.appendChild(el("rect", { x: 300, y: 596, width: 45, height: 60, rx: 4, class: "zone" + (curId === "checkout" ? " on" : "") }));
-  m.appendChild(el("text", { x: 322, y: 626, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl", style: "font-size:5.6px" }, "🛒 קופה ראשית"));
+  m.appendChild(el("rect", { x: 230, y: 596, width: 115, height: 60, rx: 4, class: "zone promo" }));
+  m.appendChild(el("text", { x: 287, y: 626, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, "מבואת מבצעים"));
   m.appendChild(el("text", { x: 300, y: 682, "text-anchor": "middle", class: "lbl" }, "▲ כניסה"));
   // aisle rows: shelves between rows, number on the main walkway, name on the left half
   for (let i = 1; i <= 14; i++) {
@@ -809,6 +807,7 @@ function drawMap() {
       m.appendChild(el("text", { x: 179, y, "text-anchor": "middle", "dominant-baseline": "central", class: "aisletxt side" }, s.right));
     } else m.appendChild(el("text", { x: 220, y, "text-anchor": "start", "dominant-baseline": "central", class: "aisletxt" + (s.est ? " est" : "") }, s.short));
     m.appendChild(el("text", { x: s.left ? 226 : 100, y, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, String(i)));
+    if (s.left) m.appendChild(el("text", { x: 63, y, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl" }, String(i)));
   }
   for (const s of SECTIONS) {
     const r = s.rect || s.row; if (!r) continue;
@@ -820,8 +819,8 @@ function drawMap() {
     m.appendChild(el("text", { x: x + w / 2, y: y + h / 2, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl",
       style: `font-size:${fitFs(s.short, (vertical ? h : w) - 4).toFixed(1)}px`, transform: vertical ? `rotate(90 ${x + w / 2} ${y + h / 2})` : "" }, s.short));
   }
-  for (const [y, h, t] of [[522, 50, "שירות עצמי"], [576, 78, "יציאה עם עגלות"]]) {
-    m.appendChild(el("rect", { x: 14, y, width: 30, height: h, rx: 4, class: "zone" }));
+  for (const [y, h, t] of [[352, 86, "שירות עצמי"], [444, 210, "קופאיות"]]) {
+    m.appendChild(el("rect", { x: 14, y, width: 30, height: h, rx: 4, class: "zone" + (curId === "checkout" ? " on" : "") }));
     m.appendChild(el("text", { x: 29, y: y + h / 2, "text-anchor": "middle", "dominant-baseline": "central", class: "lbl", style: `font-size:${fitFs(t, h - 6).toFixed(1)}px`, transform: `rotate(90 29 ${y + h / 2})` }, t));
   }
   }
@@ -1759,8 +1758,8 @@ function build3d(T) {
   const SW = STORE.W, SH = STORE.H, ex = ENTRANCE[0];
   const wallList = STORE.generated ? [[6, 6, SW - 12, 4], [6, SH - 4, ex - 36, 4], [ex + 30, SH - 4, SW - 36 - ex, 4], [6, 6, 4, SH - 6], [SW - 10, 6, 4, SH - 6]] : [[6, 6, 348, 4], [6, 656, 214, 4], [6, 6, 4, 654], [350, 6, 4, 654]];
   for (const [x, z, w, d] of wallList) { box(x, z, w, d, 26, wall); box(x - 0.3, z - 0.3, w + 0.6, d + 0.6, 4, band, 22); }
-  if (!STORE.generated) box(230, 596, 62, 60, 0.6, 0xe8dcc2);       // promo foyer mat
-  if (!STORE.generated) for (const [x, z] of [[240, 606], [264, 630]]) { box(x, z, 18, 14, 9, 0xd84a3a); box(x + 1, z + 1, 16, 12, 2, 0xffc94a, 9); }  // promo bins
+  if (!STORE.generated) box(230, 596, 115, 60, 0.6, 0xe8dcc2);       // promo foyer mat
+  if (!STORE.generated) for (const [x, z] of [[246, 610], [276, 626], [310, 608]]) { box(x, z, 18, 14, 9, 0xd84a3a); box(x + 1, z + 1, 16, 12, 2, 0xffc94a, 9); }  // promo bins
   // product instances, gathered and drawn in a few batches
   const P = { solid: solids, box: [], bottle: [], ball: [] };
   const put = (kind, x, y, z, sx, sy, sz, color, ry = 0) => P[kind].push({ x, y, z, sx, sy, sz, color, ry });
@@ -1886,12 +1885,11 @@ function build3d(T) {
   counter(...B.meat.rect.slice(0, 4), PAL.meat);
   chest(...B.frozen.rect.slice(0, 4), PAL.frozen); chest(...B.frozen.rect2.slice(0, 4), PAL.frozen);
   gondola(...B.drinks.rect.slice(0, 4), 20, 5, PAL.drinks, "bottle", 2);
-  gondola(...B.home.rect.slice(0, 4).map((v, i) => i === 3 ? 30 : v), 14, 4, PAL.home);
-  gondola(B.home.rect[0], B.home.rect[1] + 40, B.home.rect[2], 30, 14, 4, PAL.home);
+  gondola(...B.home.rect.slice(0, 4), 14, 4, PAL.home);
   { const r = B.beer.row; gondola(r[0], r[1], r[2], 4, 14, 4, PAL.beer, "bottle", 1); gondola(r[0], r[1] + r[3] - 4, r[2], 4, 14, 4, PAL.beer, "bottle", 1); }
   for (let i = 1; i <= 14; i++) { const y = AY(i); gondola(70, y + 6, 57, 6, 15, 4, AISLE_PAL[i - 1]); gondola(143, y + 6, 72, 6, 15, 4, AISLE_PAL[i - 1]); }
   // checkouts: counters with a dark belt and a small screen
-  for (let k = 0; k < 2; k++) { const z = 530 + k * 22; box(14, z, 26, 8, 8, 0xdfe3e1); box(15, z + 1.5, 24, 5, 0.6, 0x2b2f2e, 8); box(34, z + 1, 1, 4, 6, 0x37474f, 8.6); }
+  for (const z of [360, 382, 404, 452, 484, 516, 548, 580, 612]) { box(14, z, 26, 8, 8, 0xdfe3e1); box(15, z + 1.5, 24, 5, 0.6, 0x2b2f2e, 8); box(34, z + 1, 1, 4, 6, 0x37474f, 8.6); }
   }
   // product batches
   const geo = { solid: new T.BoxGeometry(1, 1, 1), box: new T.BoxGeometry(1, 1, 1), bottle: new T.CylinderGeometry(0.42, 0.5, 1, 6, 1), ball: new T.IcosahedronGeometry(0.55, 0) };
@@ -1913,14 +1911,14 @@ function build3d(T) {
   for (let i = 1; i <= 14; i++) {
     const s = BYID["a" + i], y = AY(i);
     const num = label(T, String(i), { bg: "#ffd200", fg: "#c4161c", border: "#c4161c", size: 30, scale: 0.34 }); num.position.set(228, 30, y); scene.add(num); tags.push(num);
+    const num2 = label(T, String(i), { bg: "#ffd200", fg: "#c4161c", border: "#c4161c", size: 30, scale: 0.34 }); num2.position.set(62, 30, y); scene.add(num2); tags.push(num2);
     const nm = label(T, s.left ? s.right : s.short, { size: 19, scale: 0.27, fg: "#2b302d", bg: "rgba(255,255,255,0.92)" }); nm.position.set(s.left ? 179 : 182, 24, y); scene.add(nm); tags.push(nm);
     if (s.left) { const nl = label(T, s.left, { size: 19, scale: 0.27, fg: "#2b302d", bg: "rgba(255,255,255,0.92)" }); nl.position.set(98, 24, y); scene.add(nl); tags.push(nl); }
     signs[s.id] = { off: nm, on: null };
   }
   const ent = label(T, "▲ כניסה", { bg: "rgba(46,125,91,0.95)", fg: "#fff" }); ent.position.set(300, 14, 682); scene.add(ent); tags.push(ent);
-  for (let k = 0; k < 3; k++) { const z = 602 + k * 18; box(314, z, 26, 8, 8, 0xdfe3e1); box(315, z + 1.5, 24, 5, 0.6, 0x2b2f2e, 8); box(334, z + 1, 1, 4, 6, 0x37474f, 8.6); }
-  const co = signboard(T, "🛒", "קופה ראשית", "#455a64", false); co.position.set(326, 30, 626); scene.add(co); tags.push(co);
-  const sc = label(T, "שירות עצמי · יציאה", { size: 18, scale: 0.3 }); sc.position.set(28, 24, 560); scene.add(sc); tags.push(sc);
+  const co = signboard(T, "🛒", "קופות", "#455a64", false); co.position.set(28, 30, 540); scene.add(co); tags.push(co);
+  const sc = label(T, "שירות עצמי", { size: 18, scale: 0.3 }); sc.position.set(28, 24, 392); scene.add(sc); tags.push(sc);
   }
   // dynamic layer: route, stops, you
   const dyn = new T.Group(); scene.add(dyn);
