@@ -2,7 +2,7 @@
 import { DIST } from "./distances.js";
 import { SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK, BACK_ORDER, clean, matchSection, leg, startsKw, splitList, whereFromWords } from "./store-core.js";
 
-export const END = { id: "checkout", where: "הקופות בקיר השמאלי, אחרי השתייה: קודם קופות השירות העצמי ואחריהן הקופאיות", stop: CHECKOUT, num: "✓" };
+export const END = { id: "checkout", where: "הקופות בקיר השמאלי, ממול המעברים ומיד אחרי השתייה: קודם קופות השירות העצמי ואחריהן הקופאיות", stop: CHECKOUT, num: "✓" };
 
 // walking distance between two map points, memoized (the free plan has a tight CPU budget)
 const distMemo = new Map();
@@ -78,7 +78,7 @@ export function turnText(s, prev, here) {
   if (s.id === "beer") return isBack(prev) ? "פנה למעבר הראשי" : "המשך במעבר הראשי עד הסוף";
   if (prev.stop[0] > 200 && !isBack(prev)) return "פנה שמאלה למעבר הראשי" + (s.aisle ? ` והמשך עד מעבר ${s.aisle}` : "");
   if (s.aisle) return prev.aisle && Math.abs(s.aisle - prev.aisle) === 1 ? "המעבר הבא" : isBack(prev) || prev.id === "beer" ? `פנה למעבר הראשי והמשך עד מעבר ${s.aisle}` : `המשך במעבר הראשי עד מעבר ${s.aisle}`;
-  if (s.id === "home") return "המשך במעבר הראשי לכיוון החזית";
+  if (s.id === "home") return "המשך לקיר הימני, מיד אחרי מקרר העלים";
   return s.stop[0] > 200 ? "המשך ישר" : "המשך במעבר הראשי";
 }
 
