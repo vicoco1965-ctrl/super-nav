@@ -1824,7 +1824,8 @@ function build3d(T) {
   const host = $("map3d");
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "default" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-  renderer.outputEncoding = T.sRGBEncoding;
+  if (T.SRGBColorSpace && "outputColorSpace" in renderer) renderer.outputColorSpace = T.SRGBColorSpace;
+  else if (T.sRGBEncoding !== undefined) renderer.outputEncoding = T.sRGBEncoding;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;  // the store doesn't move: draw shadows once
   host.appendChild(renderer.domElement);
   const scene = new T.Scene();
@@ -1847,7 +1848,8 @@ function build3d(T) {
     for (let i=0;i<900;i++) { const x=(i*73)%128, y=(i*47+Math.floor(i/128)*13)%128; g.fillStyle=i%2?"rgba(255,255,255,.10)":"rgba(80,75,65,.045)"; g.fillRect(x,y,2,1); }
     g.strokeStyle = "#d6d1c7"; g.lineWidth = 2; g.strokeRect(0, 0, 64, 64); g.strokeRect(64, 64, 64, 64); g.strokeRect(64, 0, 64, 64); g.strokeRect(0, 64, 64, 64);
     const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set((STORE.W - 20) / 24, (STORE.H - 10) / 24); t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    t.encoding = T.sRGBEncoding;
+    if (T.SRGBColorSpace && "colorSpace" in t) t.colorSpace = T.SRGBColorSpace;
+    else if (T.sRGBEncoding !== undefined) t.encoding = T.sRGBEncoding;
     const floor = new T.Mesh(new T.PlaneGeometry(STORE.W - 20, STORE.H - 10), new T.MeshStandardMaterial({ map: t, roughness: 0.72, metalness: 0.03 }));
     floor.rotation.x = -Math.PI / 2; floor.position.set(STORE.W / 2, 0, (STORE.H + 10) / 2); floor.receiveShadow = true; scene.add(floor);
     const out = new T.Mesh(new T.PlaneGeometry(2400, 2400), new T.MeshLambertMaterial({ color: 0xd9ddd6 })); out.rotation.x = -Math.PI / 2; out.position.set(STORE.W / 2, -0.2, STORE.H / 2); scene.add(out); }
@@ -1869,6 +1871,14 @@ function build3d(T) {
     box(x, z, w, d, 2.2, 0x56605b);
     // Shelf-edge price rails stay inside the original furniture footprint.
     for(let l=0;l<levels;l++){const yy=2.2+l*(h-3)/levels; if(alongX){box(x,z,w,0.18,0.32,0xf7f7f2,yy);box(x,z+d-0.18,w,0.18,0.32,0xf7f7f2,yy);}else{box(x,z,0.18,d,0.32,0xf7f7f2,yy);box(x+w-0.18,z,0.18,d,0.32,0xf7f7f2,yy);}}
+    // Small yellow price tickets, contained within the existing shelf footprint.
+    for (let l = 0; l < levels; l++) {
+      const yy = 2.2 + l * (h - 3) / levels;
+      for (let u = 2; u + 1.4 < len - 1; u += 5.5) {
+        if (alongX) { box(x + u, z, 1.4, 0.16, 0.28, 0xffd84a, yy); box(x + u, z + d - 0.16, 1.4, 0.16, 0.28, 0xffd84a, yy); }
+        else { box(x, z + u, 0.16, 1.4, 0.28, 0xffd84a, yy); box(x + w - 0.16, z + u, 0.16, 1.4, 0.28, 0xffd84a, yy); }
+      }
+    }
     if (alongX) box(x, z + d / 2 - 0.4, w, 0.8, h, frame); else box(x + w / 2 - 0.4, z, 0.8, d, h, frame);
     const gap = (h - 3) / levels;
     for (let l = 0; l < levels; l++) {
