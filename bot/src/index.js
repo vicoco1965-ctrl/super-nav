@@ -7,6 +7,8 @@ import { Buffer } from "node:buffer";
 import { handle, unknownNames, emptyState } from "./bot.js";
 import { sectionList, parseItems } from "./ai-parse.js";
 import { handleApi } from "./api.js";
+import { sharedFixes, BUILTIN_SLUG } from "./stores.js";
+import { setSharedFixes } from "./store-core.js";
 
 const GRAPH = env => `${env.GRAPH_BASE || "https://graph.facebook.com"}/${env.GRAPH_VERSION || "v23.0"}`;
 const AI_PER_DAY = 40; // photo / voice / AI lookups per customer per day, protects the free AI quota
@@ -66,6 +68,8 @@ export class Customer extends DurableObject {
       if (error) { await wa.text(error); return; }
       const now = Date.now();
       const state = (await store.get("state")) || emptyState();
+      // product places other shoppers corrected on the site (the bot knows only the built-in store)
+      try { setSharedFixes(await sharedFixes(this.env, BUILTIN_SLUG)); } catch (e) { console.log("fixes", e && e.message); }
       const extra = await this.aiPlace(unknownNames(text, source).filter(n => !(n in hints)));
       const out = handle(state, text, { now, origin, source, hints: { ...hints, ...extra } });
       await store.put("state", out.state);

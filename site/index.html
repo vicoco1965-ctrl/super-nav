@@ -628,7 +628,42 @@ function drawGeneric(m, curId) {
 
 // ---------- Matching ----------
 const clean = t => t.replace(/[֑-ׇ]/g, "").replace(/["'״׳]/g, m => m === "'" || m === "׳" ? "'" : '"').replace(/\s+/g, " ").trim();
+// ---------- Product location fixes (a shopper says "X is in Y") ----------
+// Mine apply right away on this phone; shared ones come from the site and count only after
+// several different shoppers reported the same place.
+const fixKey = () => STORE.slug || "yochananof-beer-sheva";
+const fixName = n => clean(String(n || "")).replace(/[?؟!.,"'׳״]/g, "").replace(/^ה(?=[א-ת]{2})/, "").trim();
+let sharedFixes = {};
+function myFixes() { try { const v = localStorage.getItem("fixes:" + fixKey()); return v ? JSON.parse(v) || {} : {}; } catch (e) { return {}; } }
+function allFixes() { return Object.assign({}, sharedFixes, myFixes()); }
+function fixFor(item) {
+  const t = fixName(item); if (!t) return null;
+  let best = null, bestLen = 0;
+  for (const [k, id] of Object.entries(allFixes())) {
+    if (!BYID[id] || !BYID[id].stop || BYID[id].end) continue;
+    if ((t === k || (k.length >= 3 && (" " + t + " ").includes(" " + k + " "))) && k.length > bestLen) { best = id; bestLen = k.length; }
+  }
+  return best;
+}
+function saveFix(name, id) {
+  const k = fixName(name); if (!k) return;
+  const mine = myFixes(); mine[k] = id;
+  try { localStorage.setItem("fixes:" + fixKey(), JSON.stringify(mine)); } catch (e) {}
+  if (!window.claude) try { fetch("api/fix", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: fixKey(), name: k, section: id }), keepalive: true }).catch(() => {}); } catch (e) {}
+}
+async function loadSharedFixes() {
+  sharedFixes = {};
+  if (window.claude) return;
+  try {
+    const r = await fetch("api/fixes/" + encodeURIComponent(fixKey()), { cache: "no-store" });
+    const j = r.ok ? await r.json() : null;
+    if (j && j.fixes && typeof j.fixes === "object") for (const [k, id] of Object.entries(j.fixes)) if (typeof id === "string" && BYID[id]) sharedFixes[fixName(k)] = id;
+  } catch (e) {}
+}
+const placeName = sec => sec.aisle ? "במעבר " + sec.aisle : inPlace(sec.short || sec.name);
+
 function matchSection(item) {
+  const fx = fixFor(item); if (fx) return fx;
   const t = clean(item);
   let best = null, bestLen = 0;
   for (const s of SECTIONS) for (const k of s.kw) {
@@ -645,7 +680,7 @@ let cur = 0;
 let isExample = true;
 
 function setItems(names, sections) {
-  items = names.map((n, i) => ({ name: n, section: (sections && BYID[sections[i]]) ? sections[i] : matchSection(n) }));
+  items = names.map((n, i) => ({ name: n, section: fixFor(n) || ((sections && BYID[sections[i]]) ? sections[i] : matchSection(n)) }));
   renderItems(); buildRoute();
 }
 
@@ -983,7 +1018,7 @@ async function speechToItems(text) {
       const secList = SECTIONS.map(s => `${s.id} = ${s.name}`).join("\n");
       const out = await sample.json(`A shopper said this in Hebrew, listing what they want to buy:\n"${text}"\nList each product separately (drop filler words like "אני צריך", "וגם", "בבקשה"). For each give its Hebrew name and the best store section id from:\n${secList}\nUse null if none fits. Answer with JSON only: {"items":[{"name":"...","section":"id or null"}]}`, { modelTier: "quick" });
       const arr = out && Array.isArray(out.items) ? out.items.filter(x => x && typeof x.name === "string" && x.name.trim()) : [];
-      if (arr.length) return arr.map(x => ({ name: x.name.trim().slice(0, 40), section: BYID[x.section] ? x.section : matchSection(x.name) }));
+      if (arr.length) return arr.map(x => ({ name: x.name.trim().slice(0, 40), section: fixFor(x.name) || (BYID[x.section] ? x.section : matchSection(x.name)) }));
     } catch (e) {}
   }
   let t = " " + text + " ";
@@ -1556,13 +1591,14 @@ function routeState() {
 }
 const brainRules = () => `You are the voice of a shopping navigation app inside the ${STORE.title} supermarket. The customer talks to you in Hebrew while walking with a phone. Understand what they want, choose app actions, and give a short spoken answer.
 Store sections (id = name, where it is):
-${SECTIONS.map(s => `${s.id} = ${s.name}, ${s.where}${s.est ? " (location not confirmed)" : ""}`).join("\n")}
+${SECTIONS.map(s => `${s.id} = ${s.name}, ${s.where}${s.est ? " (location not confirmed)" : ""}`).join("\n")}${(() => { const f = Object.entries(allFixes()).filter(([k, id]) => BYID[id]).slice(0, 60); return f.length ? "\nProducts shoppers said are in a specific place (trust these): " + f.map(([k, id]) => `${k} = ${id}`).join(", ") : ""; })()}
 Actions you can use:
 {"type":"where","name":"<product>","section":"<id>"}  customer asks where something is, or wants it now: the app goes there next (adds it to the list if missing)
 {"type":"add","items":[{"name":"<product>","section":"<id or null>"}]}  add to the list, placed at the best point of the route
 {"type":"remove","name":"<product as in the list>"}
 {"type":"next"} customer took the items or wants the next stop; {"type":"prev"}; {"type":"repeat"} repeat the current instruction
 {"type":"locate","section":"<id>"} customer says where they are standing now ("אני במעבר 8", "אני ליד הלחם")
+{"type":"move","name":"<product>","section":"<id>"} customer says a product is actually in a different place ("החלב נמצא במעבר 5", "הקטשופ עבר ליד הפסטות"): use the place the customer said, never your own guess
 {"type":"mute"} / {"type":"unmute"}; {"type":"finish"} done shopping; {"type":"list"} read what is left
 Rules: answer in natural spoken Hebrew, one or two short sentences, no lists or symbols. Talk to the customer in a neutral, friendly way. Only use section ids from the list. If you are not sure where a product is, pick the most likely section and say it is probably there. If the customer asks something unrelated to shopping in this store, answer very briefly. Do not invent prices or stock. If no action fits, use an empty actions list.
 Reply with JSON only: {"actions":[...],"reply":"<Hebrew>"}`;
@@ -1592,6 +1628,8 @@ function localBrain(text) {
   if (add) return { actions: [{ type: "add", items: splitList(add[1].replace(/\s+וגם\s+|\s+גם\s+/g, ",")).map(n => ({ name: n.replace(/^ה(?=..)/, m => startsKw(n) ? m : ""), section: null })) }] };
   const rm = t.match(/^(?:תוריד|תמחק|תמחקי|תורידי|בלי|לא צריך|לא צריכה|כבר יש לי)\s+(?:את\s+)?(.+)$/);
   if (rm) return { actions: [{ type: "remove", name: rm[1] }] };
+  const mv = t.match(/^(.+?)\s+(?:בכלל\s+|דווקא\s+|עכשיו\s+)?(?:נמצא|נמצאת|נמצאים|נמצאות|יושב|יושבת|זז|זזו|עבר|עברה|עברו)\s+(?:בכלל\s+|דווקא\s+|עכשיו\s+)?(?:ליד\s+|על\s+יד\s+|ב|ל)(?:ה)?(מעבר\s*.+|.+)$/);
+  if (mv && !/^(?:אני|אנחנו|איפה|מה|איפוא|הוא|היא|זה)$/.test(mv[1])) { const w2 = mv[2].trim(), sec = whereFromWords(w2) || whereFromWords(w2.replace(/ות$/, "ה")) || whereFromWords(w2.replace(/ים$/, "")); if (sec) return { actions: [{ type: "move", name: mv[1], section: sec.id }] }; }
   const ask = t.match(/^(?:איפה|איפוא|איפה יש|איפה נמצא(?:ת|ים|ות)?|איפה אני מוצא|אני צריך|אני צריכה|אני רוצה|תביא לי|תמצא לי|חפש|יש לכם|יש פה)\s+(.+)$/);
   if (ask) return { actions: [{ type: "where", name: ask[1].replace(/^(?:את\s+)?/, ""), section: null }] };
   if (/^(שקט|השתק|תשתוק|תשתקי|די)$/.test(t)) return { actions: [{ type: "mute" }] };
@@ -1605,7 +1643,7 @@ function localBrain(text) {
   return { actions: [], reply: "לא הבנתי. אפשר לומר למשל: איפה החלב, תוסיף ביצים, או הבא." };
 }
 const cleanName = n => { n = String(n || "").replace(/[?؟!.]/g, "").trim(); if (n.length > 3 && n[0] === "ה" && !startsKw(n) && matchSection(n.slice(1))) n = n.slice(1); return n.slice(0, 40); };
-const secFor = (name, id) => BYID[id] && BYID[id].stop && !BYID[id].end ? BYID[id] : (matchSection(name) ? BYID[matchSection(name)] : null);
+const secFor = (name, id) => fixFor(name) ? BYID[fixFor(name)] : BYID[id] && BYID[id].stop && !BYID[id].end ? BYID[id] : (matchSection(name) ? BYID[matchSection(name)] : null);
 // "ב" + place, without doubling the article: "המאפייה" -> "במאפייה"
 const inPlace = w => "ב" + String(w).replace(/^ה(?=[א-ת])/, "");
 const posNow = () => here ? here.stop : cur > 0 ? stops[cur - 1].section.stop : ENTRANCE;
@@ -1659,6 +1697,25 @@ async function runPlan(plan, text) {
     else if (a.type === "locate") {
       const sec = BYID[a.section] || (a.section && whereFromWords(String(a.section)));
       if (sec && sec.stop) { here = sec; const done = stops.slice(0, cur), end = stops[stops.length - 1]; let rest = stops.slice(cur, -1); const mine = rest.findIndex(s => s.section.id === sec.id); if (mine >= 0) rest.unshift(rest.splice(mine, 1)[0]); stops = done.concat(orderStops(sec.stop, rest, end.section.stop, mine >= 0), [end]); moved = true; notes.push(stopText(cur).say); }
+    } else if (a.type === "move") {
+      const name = cleanName(a.name);
+      const sec = BYID[a.section] && BYID[a.section].stop && !BYID[a.section].end ? BYID[a.section] : (a.section ? whereFromWords(String(a.section)) : null);
+      if (!name || !sec || !sec.stop || sec.end) { notes.push("לא הבנתי איפה המוצר נמצא. אפשר לומר למשל: החלב נמצא במעבר 5"); continue; }
+      saveFix(name, sec.id);
+      const q = fixName(name);
+      const old = items.find(i => fixName(i.name) === q) || items.find(i => fixName(i.name).includes(q) || q.includes(fixName(i.name)));
+      let label = name, routed = false;
+      if (old) {
+        label = old.name;
+        const si = stops.findIndex((s, i) => i >= cur && !s.end && s.items.includes(old.name));
+        if (si >= 0 && stops[si].section.id !== sec.id) {
+          items = items.filter(i => i !== old);
+          const st = stops[si]; st.items = st.items.filter(x => x !== old.name);
+          if (!st.items.length) { stops.splice(si, 1); cur = Math.min(cur, stops.length - 1); }
+          placeItem(label, sec, false); routed = true; moved = true;
+        } else old.section = sec.id;
+      }
+      notes.push(`תודה, רשמתי ש${label} נמצא ${placeName(sec)}` + (routed ? `. עדכנתי את המסלול. ${stopText(cur).say}` : ""));
     } else if (a.type === "mute") { setMuted(true); }
     else if (a.type === "unmute") { setMuted(false); }
     else if (a.type === "finish") { resetAll(); history_.length = 0; return; }
@@ -2403,7 +2460,7 @@ $("shareEnd").addEventListener("click", shareWithFriend);
 isExample = false;
 setItems([]);
 $("sampleBtn").addEventListener("click", () => { isExample = true; setItems(splitList(SAMPLE)); });
-loadStoreFromUrl();
+loadStoreFromUrl().then(loadSharedFixes);
 $("finishBtn").addEventListener("click", resetAll);
 if (window.claude && window.claude.use) {
   window.claude.use("sample").then(s => { sample = s; if (s) s.limits().then(l => { if (!l || !l.images) sample = null; }).catch(() => {}); });

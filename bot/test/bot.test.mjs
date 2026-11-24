@@ -136,3 +136,14 @@ test("route order is the shortest walk (checked against every order)", async () 
   perm(list.slice(), 0);
   assert.ok(Math.abs(cost(orderStops(ENTRANCE, list, false)) - best) < 0.01);
 });
+
+test("shared product fixes from shoppers override the word list", async () => {
+  const { setSharedFixes } = await import("../src/store-core.js");
+  const { handle } = await import("../src/bot.js");
+  const o = { origin: "https://x" };
+  setSharedFixes({ "חלב": "a5" });
+  try {
+    assert.match(handle(null, "איפה החלב?", o).replies[0].text, /חלב: מעבר 5/);
+  } finally { setSharedFixes({}); }
+  assert.doesNotMatch(handle(null, "איפה החלב?", o).replies[0].text, /מעבר 5/);
+});

@@ -19,9 +19,16 @@ export function buildCore(html) {
     cut("const HEB_NUM", "function rebuildPicker"),
     cut("function sideOf", "function stopText"),
   ];
+  // the site keeps this shopper's own fixes in localStorage; the bot has only the shared ones (setSharedFixes)
+  const mine = "function myFixes() {";
+  let body = parts.join("\n\n");
+  const at = body.indexOf(mine);
+  if (at < 0) throw new Error("marker not found: " + mine);
+  body = body.slice(0, at) + "function myFixes() { return {}; }" + body.slice(body.indexOf("\n", at));
+  body += "\n\nfunction setSharedFixes(f) { sharedFixes = f && typeof f === \"object\" ? f : {}; }";
   return `// GENERATED from site/index.html by bot/scripts/extract-store.mjs. Do not edit by hand.\n` +
-    parts.join("\n\n") +
-    `\n\nexport { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList, aisleWhere };\n`;
+    body +
+    `\n\nexport { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList, aisleWhere, fixName, fixFor, setSharedFixes };\n`;
 }
 // Walking distances between every pair of stops, worked out ahead of time: the Worker's free plan
 // allows only a few milliseconds of CPU per message, too little to run the path search each time.

@@ -309,7 +309,42 @@ function drawGeneric(m, curId) {
 
 // ---------- Matching ----------
 const clean = t => t.replace(/[֑-ׇ]/g, "").replace(/["'״׳]/g, m => m === "'" || m === "׳" ? "'" : '"').replace(/\s+/g, " ").trim();
+// ---------- Product location fixes (a shopper says "X is in Y") ----------
+// Mine apply right away on this phone; shared ones come from the site and count only after
+// several different shoppers reported the same place.
+const fixKey = () => STORE.slug || "yochananof-beer-sheva";
+const fixName = n => clean(String(n || "")).replace(/[?؟!.,"'׳״]/g, "").replace(/^ה(?=[א-ת]{2})/, "").trim();
+let sharedFixes = {};
+function myFixes() { return {}; }
+function allFixes() { return Object.assign({}, sharedFixes, myFixes()); }
+function fixFor(item) {
+  const t = fixName(item); if (!t) return null;
+  let best = null, bestLen = 0;
+  for (const [k, id] of Object.entries(allFixes())) {
+    if (!BYID[id] || !BYID[id].stop || BYID[id].end) continue;
+    if ((t === k || (k.length >= 3 && (" " + t + " ").includes(" " + k + " "))) && k.length > bestLen) { best = id; bestLen = k.length; }
+  }
+  return best;
+}
+function saveFix(name, id) {
+  const k = fixName(name); if (!k) return;
+  const mine = myFixes(); mine[k] = id;
+  try { localStorage.setItem("fixes:" + fixKey(), JSON.stringify(mine)); } catch (e) {}
+  if (!window.claude) try { fetch("api/fix", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: fixKey(), name: k, section: id }), keepalive: true }).catch(() => {}); } catch (e) {}
+}
+async function loadSharedFixes() {
+  sharedFixes = {};
+  if (window.claude) return;
+  try {
+    const r = await fetch("api/fixes/" + encodeURIComponent(fixKey()), { cache: "no-store" });
+    const j = r.ok ? await r.json() : null;
+    if (j && j.fixes && typeof j.fixes === "object") for (const [k, id] of Object.entries(j.fixes)) if (typeof id === "string" && BYID[id]) sharedFixes[fixName(k)] = id;
+  } catch (e) {}
+}
+const placeName = sec => sec.aisle ? "במעבר " + sec.aisle : inPlace(sec.short || sec.name);
+
 function matchSection(item) {
+  const fx = fixFor(item); if (fx) return fx;
   const t = clean(item);
   let best = null, bestLen = 0;
   for (const s of SECTIONS) for (const k of s.kw) {
@@ -441,4 +476,6 @@ const VOICE_NAME = { produce: "הפירות והירקות", greens: "מקרר �
   nuts: "הפיצוחים", dairy: "מקררי החלב", ddeli: "מעדניית הגבינות", bakery: "המאפייה", fish: "דלפק הדגים", ffish: "מקרר הדגים הקפואים", meat: "קצביית הבשר",
   chicken: "קצביית העוף", sausage: "מקררי הנקניקיות", frozen: "מקררי הקפואים", drinks: "השתייה", beer: "הבירות", paper: "הנייר הסופג" };
 
-export { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList, aisleWhere };
+function setSharedFixes(f) { sharedFixes = f && typeof f === "object" ? f : {}; }
+
+export { SPINE, RIGHT, CONNECT, BACK, LEFT, SECTIONS, BYID, ENTRANCE, CHECKOUT, BACK_ORDER, clean, matchSection, leg, startsKw, PHRASES, segment, splitList, HEB_NUM, whereFromWords, sideOf, sidedList, aisleWhere, fixName, fixFor, setSharedFixes };
