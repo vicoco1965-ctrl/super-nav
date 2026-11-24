@@ -1,5 +1,5 @@
 # Cloudflare Worker: the WhatsApp bot + the navigation site (site/ folder)
-name = "super-nav"
+name = "super-nav-3d"
 main = "bot/src/index.js"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
