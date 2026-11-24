@@ -1824,14 +1824,15 @@ function build3d(T) {
   const host = $("map3d");
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "default" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap; renderer.shadowMap.autoUpdate = false;  // the store doesn't move: draw shadows once
+  renderer.outputEncoding = T.sRGBEncoding;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;  // the store doesn't move: draw shadows once
   host.appendChild(renderer.domElement);
   const scene = new T.Scene();
   { const c = document.createElement("canvas"); c.width = 4; c.height = 256; const g = c.getContext("2d"); const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, "#cfe0ea"); gr.addColorStop(1, "#f4f1ea"); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); const t = new T.CanvasTexture(c); scene.background = t; }
   scene.fog = new T.Fog(0xe9ece8, 520, 1200);
   const camera = new T.PerspectiveCamera(50, 1, 2, 3000);
-  scene.add(new T.HemisphereLight(0xffffff, 0xaab3ad, 0.8));
-  const sun = new T.DirectionalLight(0xfff8ee, 0.55); sun.position.set(STORE.W / 2 - 70, 420, STORE.H / 2 + 190); sun.target.position.set(STORE.W / 2, 0, STORE.H / 2);
+  scene.add(new T.HemisphereLight(0xffffff, 0xb9b6ad, 0.72));
+  const sun = new T.DirectionalLight(0xfff8ee, 0.85); sun.position.set(STORE.W / 2 - 70, 420, STORE.H / 2 + 190); sun.target.position.set(STORE.W / 2, 0, STORE.H / 2);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0008; sun.shadow.radius = 4;
   const SB = Math.max(STORE.W, STORE.H) * 0.62 + 40; Object.assign(sun.shadow.camera, { left: -SB, right: SB, top: SB, bottom: -SB, near: 50, far: 1600 });
   scene.add(sun, sun.target);
@@ -1842,10 +1843,12 @@ function build3d(T) {
   const box = (x, z, w, d, h, color, y0 = 0) => { solids.push({ x: x + w / 2, y: y0 + h / 2, z: z + d / 2, sx: w, sy: h, sz: d, color, ry: 0 }); };
   // tiled floor
   { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
-    g.fillStyle = "#efece6"; g.fillRect(0, 0, 128, 128); g.fillStyle = "#e6e2da"; g.fillRect(0, 0, 64, 64); g.fillRect(64, 64, 64, 64);
+    g.fillStyle = "#e8e5df"; g.fillRect(0, 0, 128, 128); g.fillStyle = "#e0ddd7"; g.fillRect(0, 0, 64, 64); g.fillRect(64, 64, 64, 64);
+    for (let i=0;i<900;i++) { const x=(i*73)%128, y=(i*47+Math.floor(i/128)*13)%128; g.fillStyle=i%2?"rgba(255,255,255,.10)":"rgba(80,75,65,.045)"; g.fillRect(x,y,2,1); }
     g.strokeStyle = "#d6d1c7"; g.lineWidth = 2; g.strokeRect(0, 0, 64, 64); g.strokeRect(64, 64, 64, 64); g.strokeRect(64, 0, 64, 64); g.strokeRect(0, 64, 64, 64);
     const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set((STORE.W - 20) / 24, (STORE.H - 10) / 24); t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    const floor = new T.Mesh(new T.PlaneGeometry(STORE.W - 20, STORE.H - 10), new T.MeshLambertMaterial({ map: t }));
+    t.encoding = T.sRGBEncoding;
+    const floor = new T.Mesh(new T.PlaneGeometry(STORE.W - 20, STORE.H - 10), new T.MeshStandardMaterial({ map: t, roughness: 0.72, metalness: 0.03 }));
     floor.rotation.x = -Math.PI / 2; floor.position.set(STORE.W / 2, 0, (STORE.H + 10) / 2); floor.receiveShadow = true; scene.add(floor);
     const out = new T.Mesh(new T.PlaneGeometry(2400, 2400), new T.MeshLambertMaterial({ color: 0xd9ddd6 })); out.rotation.x = -Math.PI / 2; out.position.set(STORE.W / 2, -0.2, STORE.H / 2); scene.add(out); }
   // walls with a green band
@@ -1864,6 +1867,8 @@ function build3d(T) {
   function gondola(x, z, w, d, h, levels, pal, kind = "box", sides = 2, frame = 0xe9ebe8) {
     const alongX = w >= d, len = alongX ? w : d, depth = alongX ? d : w;
     box(x, z, w, d, 2.2, 0x56605b);
+    // Shelf-edge price rails stay inside the original furniture footprint.
+    for(let l=0;l<levels;l++){const yy=2.2+l*(h-3)/levels; if(alongX){box(x,z,w,0.18,0.32,0xf7f7f2,yy);box(x,z+d-0.18,w,0.18,0.32,0xf7f7f2,yy);}else{box(x,z,0.18,d,0.32,0xf7f7f2,yy);box(x+w-0.18,z,0.18,d,0.32,0xf7f7f2,yy);}}
     if (alongX) box(x, z + d / 2 - 0.4, w, 0.8, h, frame); else box(x + w / 2 - 0.4, z, 0.8, d, h, frame);
     const gap = (h - 3) / levels;
     for (let l = 0; l < levels; l++) {
@@ -1993,12 +1998,12 @@ function build3d(T) {
   for (const z of [272, 290, 308, 334, 356, 378, 400, 422]) { box(14, z, 26, 8, 8, 0xdfe3e1); box(15, z + 1.5, 24, 5, 0.6, 0x2b2f2e, 8); box(34, z + 1, 1, 4, 6, 0x37474f, 8.6); }
   }
   // product batches
-  const geo = { solid: new T.BoxGeometry(1, 1, 1), box: new T.BoxGeometry(1, 1, 1), bottle: new T.CylinderGeometry(0.42, 0.5, 1, 6, 1), ball: new T.IcosahedronGeometry(0.55, 0) };
+  const geo = { solid: new T.BoxGeometry(1, 1, 1), box: new T.BoxGeometry(1, 1, 1), bottle: new T.LatheGeometry([new T.Vector2(0,-0.5),new T.Vector2(0.43,-0.5),new T.Vector2(0.48,-0.43),new T.Vector2(0.48,0.17),new T.Vector2(0.22,0.34),new T.Vector2(0.19,0.48),new T.Vector2(0,0.48)], 8), ball: new T.IcosahedronGeometry(0.55, 1) };
   const dummy = new T.Object3D(), col = new T.Color();
   let count = 0;
   for (const kind in P) {
     const list = P[kind]; if (!list.length) continue; if (kind !== "solid") count += list.length;
-    const im = new T.InstancedMesh(geo[kind], new T.MeshLambertMaterial({ color: 0xffffff }), list.length);
+    const im = new T.InstancedMesh(geo[kind], new T.MeshStandardMaterial({ color: 0xffffff, roughness: kind === "bottle" ? 0.36 : kind === "ball" ? 0.65 : 0.82, metalness: kind === "solid" ? 0.06 : 0.0 }), list.length);
     list.forEach((p, i) => { dummy.position.set(p.x, p.y, p.z); dummy.rotation.set(0, p.ry, 0); dummy.scale.set(p.sx, p.sy, p.sz); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); im.setColorAt(i, col.setHex(p.color)); });
     im.castShadow = kind !== "ball"; im.receiveShadow = true; scene.add(im);
   }
