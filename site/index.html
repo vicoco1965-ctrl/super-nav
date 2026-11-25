@@ -1820,10 +1820,57 @@ const AISLE_PAL = [[0xf4a261, 0xe9c46a, 0xd62828, 0x6a994e], [0x8d5524, 0xc68642
   [0x8338ec, 0x3a86ff, 0xffbe0b, 0x2b2d42], [0xffffff, 0xf8f9fa, 0xe63946, 0x457b9d], [0x6a040f, 0x9d0208, 0xffba08, 0x370617]];
 const DEPT_ACCENT = { produce: "#4caf50", greens: "#2e7d32", nuts: "#a1683a", dairy: "#2f80d1", ddeli: "#f2a900", bakery: "#c47f2c", meat: "#c0392b",
   frozen: "#4fb3e8", drinks: "#7e57c2", home: "#78909c", beer: "#d4a017" };
+// Reference finishes from the Yohananof aisle photos. These meshes are visual only.
+function aislePlacard(T, number, name, x, z) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512; canvas.height = 128;
+  const g = canvas.getContext("2d");
+  g.fillStyle = "#353735"; g.fillRect(0, 0, 512, 128);
+  g.fillStyle = "#e7c65a"; g.fillRect(5, 5, 502, 118);
+  g.fillStyle = "#e9e2d3"; g.fillRect(111, 13, 385, 102);
+  const red = g.createLinearGradient(0, 17, 0, 112);
+  red.addColorStop(0, "#b85250"); red.addColorStop(1, "#8d3437");
+  g.fillStyle = red; g.fillRect(116, 18, 375, 92);
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillStyle = "#282522"; g.font = "bold 67px Arial";
+  g.fillText(number, 59, 66);
+  g.fillStyle = "#fff7ee"; g.direction = "rtl"; g.font = "bold 35px Arial";
+  g.fillText(name, 304, 65, 352);
+  const map = new T.CanvasTexture(canvas);
+  map.encoding = T.sRGBEncoding;
+  const sign = new T.Mesh(new T.PlaneGeometry(29, 7.25),
+    new T.MeshBasicMaterial({ map }));
+  sign.position.set(x, 28, z);
+  const back = new T.Mesh(sign.geometry, sign.material);
+  back.rotation.y = Math.PI;
+  sign.add(back);
+  return sign;
+}
+function packagingTexture(T, bottle) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128; canvas.height = 128;
+  const g = canvas.getContext("2d");
+  const print = g.createLinearGradient(0, 0, 128, 0);
+  print.addColorStop(0, "#898989"); print.addColorStop(0.27, "#fff");
+  print.addColorStop(0.73, "#ececec"); print.addColorStop(1, "#999");
+  g.fillStyle = print; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = "#252525"; g.fillRect(0, 0, 128, bottle ? 9 : 14);
+  g.fillStyle = "#fefefe"; g.fillRect(0, 38, 128, 50);
+  for (let x = 0; x < 128; x += 32) {
+    g.fillStyle = "#575757"; g.fillRect(x + 4, 48, 24, 4);
+    g.fillStyle = "#9d9d9d"; g.fillRect(x + 8, 56, 16, 2);
+    g.beginPath(); g.ellipse(x + 16, 71, 7, 9, 0.6, 0, 2 * Math.PI); g.fill();
+    for (let stripe = 3; stripe < 22; stripe += 3) g.fillRect(x + stripe, 98, 1, 11);
+  }
+  const map = new T.CanvasTexture(canvas);
+  map.encoding = T.sRGBEncoding;
+  return map;
+}
 function build3d(T) {
   const host = $("map3d");
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "default" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  const handheld = matchMedia("(pointer: coarse)").matches;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, handheld ? 1.25 : 1.75));
   if (T.SRGBColorSpace && "outputColorSpace" in renderer) renderer.outputColorSpace = T.SRGBColorSpace;
   else if (T.sRGBEncoding !== undefined) renderer.outputEncoding = T.sRGBEncoding;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;  // the store doesn't move: draw shadows once
@@ -1834,7 +1881,7 @@ function build3d(T) {
   const camera = new T.PerspectiveCamera(50, 1, 2, 3000);
   scene.add(new T.HemisphereLight(0xffffff, 0xb9b6ad, 0.72));
   const sun = new T.DirectionalLight(0xfff8ee, 0.85); sun.position.set(STORE.W / 2 - 70, 420, STORE.H / 2 + 190); sun.target.position.set(STORE.W / 2, 0, STORE.H / 2);
-  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0008; sun.shadow.radius = 4;
+  sun.castShadow = true; const shadowSize = handheld ? 1024 : 2048; sun.shadow.mapSize.set(shadowSize, shadowSize); sun.shadow.bias = -0.0008; sun.shadow.radius = 4;
   const SB = Math.max(STORE.W, STORE.H) * 0.62 + 40; Object.assign(sun.shadow.camera, { left: -SB, right: SB, top: SB, bottom: -SB, near: 50, far: 1600 });
   scene.add(sun, sun.target);
   const mats = {};
@@ -1844,9 +1891,9 @@ function build3d(T) {
   const box = (x, z, w, d, h, color, y0 = 0) => { solids.push({ x: x + w / 2, y: y0 + h / 2, z: z + d / 2, sx: w, sy: h, sz: d, color, ry: 0 }); };
   // tiled floor
   { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
-    g.fillStyle = "#e8e5df"; g.fillRect(0, 0, 128, 128); g.fillStyle = "#e0ddd7"; g.fillRect(0, 0, 64, 64); g.fillRect(64, 64, 64, 64);
+    g.fillStyle = "#d2cbc0"; g.fillRect(0, 0, 128, 128); g.fillStyle = "#ccc4b9"; g.fillRect(0, 0, 64, 64); g.fillRect(64, 64, 64, 64);
     for (let i=0;i<900;i++) { const x=(i*73)%128, y=(i*47+Math.floor(i/128)*13)%128; g.fillStyle=i%2?"rgba(255,255,255,.10)":"rgba(80,75,65,.045)"; g.fillRect(x,y,2,1); }
-    g.strokeStyle = "#d6d1c7"; g.lineWidth = 2; g.strokeRect(0, 0, 64, 64); g.strokeRect(64, 64, 64, 64); g.strokeRect(64, 0, 64, 64); g.strokeRect(0, 64, 64, 64);
+    g.strokeStyle = "#aca397"; g.lineWidth = 2; g.strokeRect(0, 0, 64, 64); g.strokeRect(64, 64, 64, 64); g.strokeRect(64, 0, 64, 64); g.strokeRect(0, 64, 64, 64);
     const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set((STORE.W - 20) / 24, (STORE.H - 10) / 24); t.anisotropy = renderer.capabilities.getMaxAnisotropy();
     if (T.SRGBColorSpace && "colorSpace" in t) t.colorSpace = T.SRGBColorSpace;
     else if (T.sRGBEncoding !== undefined) t.encoding = T.sRGBEncoding;
@@ -1869,6 +1916,15 @@ function build3d(T) {
   function gondola(x, z, w, d, h, levels, pal, kind = "box", sides = 2, frame = 0xe9ebe8) {
     const alongX = w >= d, len = alongX ? w : d, depth = alongX ? d : w;
     box(x, z, w, d, 2.2, 0x56605b);
+    for (const u of [0, len - 0.55]) {
+      if (alongX) {
+        box(x + u, z, 0.55, 0.45, h, frame);
+        box(x + u, z + d - 0.45, 0.55, 0.45, h, frame);
+      } else {
+        box(x, z + u, 0.45, 0.55, h, frame);
+        box(x + w - 0.45, z + u, 0.45, 0.55, h, frame);
+      }
+    }
     // Shelf-edge price rails stay inside the original furniture footprint.
     for(let l=0;l<levels;l++){const yy=2.2+l*(h-3)/levels; if(alongX){box(x,z,w,0.18,0.32,0xf7f7f2,yy);box(x,z+d-0.18,w,0.18,0.32,0xf7f7f2,yy);}else{box(x,z,0.18,d,0.32,0xf7f7f2,yy);box(x+w-0.18,z,0.18,d,0.32,0xf7f7f2,yy);}}
     // Small yellow price tickets, contained within the existing shelf footprint.
@@ -2007,17 +2063,49 @@ function build3d(T) {
   // checkouts: counters with a dark belt and a small screen
   for (const z of [272, 290, 308, 334, 356, 378, 400, 422]) { box(14, z, 26, 8, 8, 0xdfe3e1); box(15, z + 1.5, 24, 5, 0.6, 0x2b2f2e, 8); box(34, z + 1, 1, 4, 6, 0x37474f, 8.6); }
   }
+  // Keep the ceiling out of overhead views. Three instanced batches cover the whole roof.
+  const ceiling = new T.Group();
+  const ceilingBox = new T.BoxGeometry(1, 1, 1);
+  const roof = new T.Mesh(ceilingBox, new T.MeshLambertMaterial({ color: 0x777572 }));
+  roof.position.set(SW / 2, 48, SH / 2); roof.scale.set(SW, 0.8, SH);
+  ceiling.add(roof);
+  for (const [x, z, w, d] of wallList) {
+    if (w <= 0 || d <= 0) continue;
+    const upperWall = new T.Mesh(ceilingBox, mat(wall));
+    upperWall.position.set(x + w / 2, 37, z + d / 2);
+    upperWall.scale.set(w, 22, d);
+    ceiling.add(upperWall);
+  }
+  const crossbeams = Array.from({ length: Math.floor(SH / 19) }, (_, i) => [SW / 2, 46, i * 19 + 9, SW, 1.2, 0.8]);
+  const girders = Array.from({ length: Math.floor(SW / 66) }, (_, i) => [i * 66 + 22, 43, SH / 2, 1.9, 2.6, SH]);
+  const strips = girders.map(([x, , z]) => [x + 9, 41, z, 0.8, 0.3, SH - 18]);
+  const fixture = new T.Object3D();
+  for (const [parts, material] of [
+    [crossbeams, new T.MeshLambertMaterial({ color: 0x4f5050 })],
+    [girders, new T.MeshLambertMaterial({ color: 0x292d31 })],
+    [strips, new T.MeshBasicMaterial({ color: 0xfff7e9 })],
+  ]) {
+    const batch = new T.InstancedMesh(ceilingBox, material, parts.length);
+    parts.forEach(([x, y, z, w, h, d], i) => {
+      fixture.position.set(x, y, z); fixture.scale.set(w, h, d);
+      fixture.updateMatrix(); batch.setMatrixAt(i, fixture.matrix);
+    });
+    ceiling.add(batch);
+  }
+  ceiling.visible = false;
+  scene.add(ceiling);
   // product batches
   const geo = { solid: new T.BoxGeometry(1, 1, 1), box: new T.BoxGeometry(1, 1, 1), bottle: new T.LatheGeometry([new T.Vector2(0,-0.5),new T.Vector2(0.43,-0.5),new T.Vector2(0.48,-0.43),new T.Vector2(0.48,0.17),new T.Vector2(0.22,0.34),new T.Vector2(0.19,0.48),new T.Vector2(0,0.48)], 8), ball: new T.IcosahedronGeometry(0.55, 1) };
   const dummy = new T.Object3D(), col = new T.Color();
   let count = 0;
   for (const kind in P) {
     const list = P[kind]; if (!list.length) continue; if (kind !== "solid") count += list.length;
-    const im = new T.InstancedMesh(geo[kind], new T.MeshStandardMaterial({ color: 0xffffff, roughness: kind === "bottle" ? 0.36 : kind === "ball" ? 0.65 : 0.82, metalness: kind === "solid" ? 0.06 : 0.0 }), list.length);
+    const im = new T.InstancedMesh(geo[kind], new T.MeshStandardMaterial({ color: 0xffffff, map: kind === "box" || kind === "bottle" ? packagingTexture(T, kind === "bottle") : null, roughness: kind === "bottle" ? 0.36 : kind === "ball" ? 0.65 : 0.82, metalness: kind === "solid" ? 0.06 : 0.0 }), list.length);
     list.forEach((p, i) => { dummy.position.set(p.x, p.y, p.z); dummy.rotation.set(0, p.ry, 0); dummy.scale.set(p.sx, p.sy, p.sz); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); im.setColorAt(i, col.setHex(p.color)); });
     im.castShadow = kind !== "ball"; im.receiveShadow = true; scene.add(im);
   }
   // hanging signs
+  const placards = new T.Group(); scene.add(placards);
   if (STORE.generated) buildGenericSigns(); else {
   for (const s of SECTIONS) {
     const r = s.rect || s.row; if (!r || s.aisle) continue;
@@ -2026,6 +2114,10 @@ function build3d(T) {
   }
   for (let i = 1; i <= 14; i++) {
     const s = BYID["a" + i], y = AY(i);
+    for (const x of [62, 228]) {
+      const sign = aislePlacard(T, i, s.short, x, y);
+      placards.add(sign);
+    }
     const num = label(T, String(i), { bg: "#ffd200", fg: "#c4161c", border: "#c4161c", size: 30, scale: 0.34 }); num.position.set(228, 30, y); scene.add(num); tags.push(num);
     const num2 = label(T, String(i), { bg: "#ffd200", fg: "#c4161c", border: "#c4161c", size: 30, scale: 0.34 }); num2.position.set(62, 30, y); scene.add(num2); tags.push(num2);
     const nm = label(T, s.left ? s.right : s.short, { size: 19, scale: 0.27, fg: "#2b302d", bg: "rgba(255,255,255,0.92)" }); nm.position.set(s.left ? 179 : 182, 24, y); scene.add(nm); tags.push(nm);
@@ -2042,8 +2134,12 @@ function build3d(T) {
   const glow = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false }));
   glow.rotation.x = -Math.PI / 2; glow.position.y = 0.35; scene.add(glow);
   renderer.shadowMap.needsUpdate = true;
-  view3d = { T, renderer, scene, camera, dyn, glow, signs, tags, host, cam: null, camFrom: null, camT: 1, chevrons: [], pin: null, you: null, raf: 0, lastFrame: 0, overview: false, products: count };
-  const ro = new ResizeObserver(() => size3d()); ro.observe(host);
+  view3d = { T, renderer, scene, camera, dyn, glow, signs, tags, ceiling, placards, host, cam: null, camFrom: null, camT: 1, chevrons: [], pin: null, you: null, raf: 0, lastFrame: 0, overview: false, products: count };
+  const ro = new ResizeObserver(() => {
+    size3d();
+    if (view3d && view3d.overview && mapMode !== "2d") aimCamera();
+  });
+  ro.observe(host);
   size3d();
 }
 function size3d() {
@@ -2134,13 +2230,17 @@ function aimCamera() {
   const S = here ? here.stop : L[0], E = L[L.length - 1];
   let pos, tgt, fov = 50;
   if (v.overview) {
-    pos = [STORE.W / 2, Math.max(STORE.W, STORE.H) * 0.82, STORE.H * 1.32]; tgt = [STORE.W / 2, 0, STORE.H / 2];
+    const halfHeight = Math.max(STORE.H / 2 + 26, (STORE.W / 2 + 20) / v.camera.aspect);
+    const height = halfHeight / Math.tan(fov * Math.PI / 360);
+    v.camera.far = Math.max(3000, height + 100);
+    v.camera.updateProjectionMatrix();
+    pos = [STORE.W / 2, height, STORE.H / 2 + 0.1]; tgt = [STORE.W / 2, 0, STORE.H / 2];
   } else if (mapMode === "eye") {
     // stand at the start, look toward the first turn of the walk
     let k = 1; while (k < L.length - 1 && Math.hypot(L[k][0] - S[0], L[k][1] - S[1]) < 12) k++;
     const P = L[Math.min(k, L.length - 1)];
     let dx = P[0] - S[0], dz = P[1] - S[1], d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
-    pos = [S[0] - dx * 6, 22, S[1] - dz * 6]; tgt = [S[0] + dx * 80, 4, S[1] + dz * 80]; fov = 66;
+    pos = [S[0], 22, S[1]]; tgt = [S[0] + dx * 80, 4, S[1] + dz * 80]; fov = 66;
   } else {
     let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
     for (const [x, z] of L) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
@@ -2151,6 +2251,25 @@ function aimCamera() {
     pos = [cx - dx * dist * 0.62, dist * 0.78, cz - dz * dist * 0.62]; tgt = [cx + dx * 10, 0, cz + dz * 10];
   }
   v.camFrom = v.cam ? { pos: v.cam.pos.slice(), tgt: v.cam.tgt.slice(), fov: v.cam.fov } : { pos, tgt, fov };
+  const eyeLeg = mapMode === "eye" && !v.overview ? L : null;
+  const previousLeg = v.eyeLeg;
+  v.eyeLeg = eyeLeg;
+  v.cameraWalk = null;
+  if (eyeLeg && previousLeg && v.camT === 1) {
+    const [endX, endZ] = previousLeg[previousLeg.length - 1];
+    if (Math.hypot(endX - pos[0], endZ - pos[2]) < 0.01) {
+      let distance = 0;
+      const segments = [];
+      for (let i = 1; i < previousLeg.length; i++) {
+        const [x, z] = previousLeg[i - 1], [nx, nz] = previousLeg[i];
+        const length = Math.hypot(nx - x, nz - z);
+        if (!length) continue;
+        segments.push({ x, z, nx, nz, start: distance, length });
+        distance += length;
+      }
+      if (distance) v.cameraWalk = { distance, segments };
+    }
+  }
   v.camTo = { pos, tgt, fov }; v.camT = 0; v.camStart = performance.now();
   if (!v.cam) v.cam = { pos: pos.slice(), tgt: tgt.slice(), fov };
   run3d();
@@ -2158,18 +2277,37 @@ function aimCamera() {
 function tick3d(force) {
   const v = view3d; if (!v) return;
   const now = performance.now();
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (v.camT < 1) {
-    v.camT = Math.min(1, (now - v.camStart) / 900);
+    const walk = v.cameraWalk;
+    const duration = walk ? Math.min(2600, 700 + walk.distance * 5) : 900;
+    v.camT = still ? 1 : Math.min(1, (now - v.camStart) / duration);
     const e = v.camT < 0.5 ? 2 * v.camT * v.camT : 1 - Math.pow(-2 * v.camT + 2, 2) / 2;
     const mix = (a, b) => a.map((x, i) => x + (b[i] - x) * e);
     v.cam = { pos: mix(v.camFrom.pos, v.camTo.pos), tgt: mix(v.camFrom.tgt, v.camTo.tgt), fov: v.camFrom.fov + (v.camTo.fov - v.camFrom.fov) * e };
+    if (walk && v.camT < 1) {
+      const pointAt = distance => {
+        const part = walk.segments.find(s => distance <= s.start + s.length)
+          || walk.segments[walk.segments.length - 1];
+        const t = Math.min(1, (distance - part.start) / part.length);
+        return [part.x + (part.nx - part.x) * t, part.z + (part.nz - part.z) * t];
+      };
+      const distance = e * walk.distance;
+      const [x, z] = pointAt(distance), [nx, nz] = pointAt(distance + 12);
+      const turn = Math.max(0, (e - 0.8) * 5);
+      const blend = (a, b) => a + (b - a) * turn;
+      v.cam.pos = [x, v.camTo.pos[1], z];
+      v.cam.tgt = [blend(nx, v.camTo.tgt[0]), blend(19, v.camTo.tgt[1]), blend(nz, v.camTo.tgt[2])];
+    }
   }
   if (v.cam) { v.camera.position.set(...v.cam.pos); v.camera.lookAt(...v.cam.tgt); if (v.camera.fov !== v.cam.fov) { v.camera.fov = v.cam.fov; v.camera.updateProjectionMatrix(); } }
   // gentle motion: pin bobs, arrows flow toward the stop, the "you" ring pulses
-  const t = now / 1000, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const t = now / 1000;
   if (v.pin) v.pin.position.y = 20 + (still ? 0 : Math.sin(t * 3) * 2);
   // at eye level you are the camera: hide your own marker and the signs right on top of you
   const eye = mapMode === "eye" && !v.overview;
+  v.ceiling.visible = eye && v.camera.position.y < 39;
+  v.placards.visible = eye;
   if (v.you) v.you.visible = !eye;
   { const cp = v.camera.position; for (const sp of v.tags) sp.visible = sp.userData.base !== false && (!eye || Math.hypot(sp.position.x - cp.x, sp.position.z - cp.z) > 70); if (v.faint) v.faint.visible = !eye; }
   if (v.youRing) { const k = still ? 1 : 1 + 0.25 * Math.sin(t * 4); v.youRing.scale.set(k, k, k); }
@@ -2199,17 +2337,15 @@ function applyMapMode() {
   $("map3d").hidden = !is3; $("map").style.visibility = is3 ? "hidden" : "";
   $("modeBtn").textContent = mapMode === "3d" ? "👁️ גובה העיניים" : mapMode === "eye" ? "🗺️ מפה שטוחה" : "🧊 תלת-ממד";
   $("modeBtn").setAttribute("aria-label", "החלף תצוגת מפה, עכשיו: " + (mapMode === "3d" ? "תלת-ממד" : mapMode === "eye" ? "גובה העיניים" : "מפה שטוחה"));
-  if (is3) { size3d(); aimCamera(); } else fitMap();
+  if (is3) { size3d(); update3d(); } else fitMap();
 }
 async function start3d() {
   if (view3d || three3dFailed) { applyMapMode(); return; }
   try {
-    const c = document.createElement("canvas");
-    if (!(c.getContext("webgl") || c.getContext("experimental-webgl"))) throw new Error("no webgl");
     const T = await loadThree();
     try { await document.fonts.ready; } catch (e) {}
-    build3d(T); update3d();
-  } catch (e) { three3dFailed = true; mapMode = "2d"; $("modeBtn").hidden = true; }
+    build3d(T);
+  } catch (e) { console.warn("3D map unavailable", e); three3dFailed = true; mapMode = "2d"; $("modeBtn").hidden = true; }
   applyMapMode();
 }
 $("modeBtn").addEventListener("click", () => {
